@@ -7,9 +7,9 @@
 </span><a name="line-7"></a><span class="hs-pragma">{-# LANGUAGE TypeInType          #-}</span><span>
 </span><a name="line-8"></a><span>
 </span><a name="line-9"></a><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Numeric</span><span class="hs-operator">.</span><span class="hs-identifier">Hamilton</span><span>
-</span><a name="line-10"></a><span>  </span><span class="hs-special">(</span><span> </span><a href="Numeric.Hamilton.html#Config"><span class="hs-identifier hs-type">Config</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
-</span><a name="line-11"></a><span>  </span><span class="hs-special">,</span><span> </span><a href="Numeric.Hamilton.html#Phase"><span class="hs-identifier hs-type">Phase</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
-</span><a name="line-12"></a><span>  </span><span class="hs-special">,</span><span> </span><a href="Numeric.Hamilton.html#System"><span class="hs-identifier hs-type">System</span></a><span>
+</span><a name="line-10"></a><span>  </span><span class="hs-special">(</span><span> </span><a href="Numeric.Hamilton.html#System"><span class="hs-identifier hs-type">System</span></a><span>
+</span><a name="line-11"></a><span>  </span><span class="hs-special">,</span><span> </span><a href="Numeric.Hamilton.html#Config"><span class="hs-identifier hs-type">Config</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><a name="line-12"></a><span>  </span><span class="hs-special">,</span><span> </span><a href="Numeric.Hamilton.html#Phase"><span class="hs-identifier hs-type">Phase</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
 </span><a name="line-13"></a><span>  </span><span class="hs-special">,</span><span> </span><a href="Numeric.Hamilton.html#mkSystem"><span class="hs-identifier hs-var">mkSystem</span></a><span>
 </span><a name="line-14"></a><span>  </span><span class="hs-special">,</span><span> </span><a href="Numeric.Hamilton.html#mkPhase"><span class="hs-identifier hs-var">mkPhase</span></a><span>
 </span><a name="line-15"></a><span>  </span><span class="hs-special">,</span><span> </span><a href="Numeric.Hamilton.html#fromPhase"><span class="hs-identifier hs-var">fromPhase</span></a><span>
@@ -120,7 +120,7 @@
 </span><a name="line-120"></a><a name="vec2l"><a href="Numeric.Hamilton.html#vec2l"><span class="hs-identifier">vec2l</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">fromJust</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><a name="local-1627465567"><a href="#local-1627465567"><span class="hs-identifier">rs</span></a></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier hs-var">withRows</span><span> </span><a href="#local-1627465567"><span class="hs-identifier hs-var">rs</span></a><span> </span><span class="hs-identifier hs-var">exactDims</span><span class="hs-special">)</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier hs-var">toList</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier hs-var">fmap</span><span> </span><a href="Numeric.Hamilton.html#vec2r"><span class="hs-identifier hs-var">vec2r</span></a><span>
 </span><a name="line-121"></a><span>
 </span><a name="line-122"></a><span class="hs-comment">-- | Create a system with @n@ generalized coordinates by providing the</span><span>
-</span><a name="line-123"></a><span class="hs-comment">-- underlying masses, describing its coordinate space, and giving</span><span>
+</span><a name="line-123"></a><span class="hs-comment">-- underlying inertials, describing its coordinate space, and giving</span><span>
 </span><a name="line-124"></a><span class="hs-comment">-- pontential energy function.</span><span>
 </span><a name="line-125"></a><span class="hs-comment">--</span><span>
 </span><a name="line-126"></a><span class="hs-comment">-- Given by describing some fundamental properties of the underlying</span><span>

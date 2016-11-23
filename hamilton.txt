@@ -10,6 +10,22 @@
 
 module Numeric.Hamilton
 
+-- | Represents a physical system in which physics happens. A
+--   <tt><a>System</a> m n</tt> is a system whose state described using
+--   <tt>n</tt> generalized coordinates (an "<tt>n</tt>-dimensional"
+--   system), where the underlying cartesian coordinate space is
+--   <tt>m</tt>-dimensional.
+--   
+--   For the most part, you are supposed to be able to ignore <tt>m</tt>.
+--   <tt>m</tt> is only provided because it's useful when plotting/drawing
+--   the system with a given state back in rectangular coordinates.
+--   
+--   A <tt><a>System</a> m n</tt>'s state is described using a
+--   <tt><a>Config</a> n</tt> (which describes the system in configuration
+--   space) or a <tt><a>Phase</a> n</tt> (which describes the system in
+--   phase space).
+data System :: Nat -> Nat -> Type
+
 -- | Represents the full state of a system of <tt>n</tt> generalized
 --   coordinates in configuration space (informally, "positions and
 --   velocities")
@@ -46,24 +62,8 @@ data Config :: Nat -> Type
 data Phase :: Nat -> Type
 [Phs] :: {phsPos :: !(R n)  The current values ("positions") of each of the @n@ generalized coordinates., phsMom :: !(R n)  The current conjugate momenta ("momentums") to each of the @n@ generalized coordinates} -> Phase n
 
--- | Represents a physical system in which physics happens. A
---   <tt><a>System</a> m n</tt> is a system whose state described using
---   <tt>n</tt> generalized coordinates (an "<tt>n</tt>-dimensional"
---   system), where the underlying cartesian coordinate space is
---   <tt>m</tt>-dimensional.
---   
---   For the most part, you are supposed to be able to ignore <tt>m</tt>.
---   <tt>m</tt> is only provided because it's useful when plotting/drawing
---   the system with a given state back in rectangular coordinates.
---   
---   A <tt><a>System</a> m n</tt>'s state is described using a
---   <tt><a>Config</a> n</tt> (which describes the system in configuration
---   space) or a <tt><a>Phase</a> n</tt> (which describes the system in
---   phase space).
-data System :: Nat -> Nat -> Type
-
 -- | Create a system with <tt>n</tt> generalized coordinates by providing
---   the underlying masses, describing its coordinate space, and giving
+--   the underlying inertials, describing its coordinate space, and giving
 --   pontential energy function.
 --   
 --   Given by describing some fundamental properties of the underlying
