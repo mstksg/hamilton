@@ -1,17 +1,20 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TypeInType          #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Numeric.Hamilton
   ( System
   , Config(..)
   , Phase(..)
   , mkSystem
-  , mkPhase
+  , toPhase
   , fromPhase
   , momenta
   , velocities
@@ -19,11 +22,13 @@ module Numeric.Hamilton
   , keP
   , lagrangian
   , hamiltonian
+  , hamEqs
   ) where
 
 import           Data.Foldable
 import           Data.Kind
 import           Data.Maybe
+import           GHC.Generics                 (Generic)
 import           GHC.TypeLits
 import           Numeric.AD
 import           Numeric.LinearAlgebra.Static
@@ -41,7 +46,7 @@ import qualified Data.Vector.Sized            as V
 -- with because of the lack of some neat underlying symmetries.
 --
 -- You can convert a @'Config' n@ into a @'Phase' n@ (convert from
--- configuration space to phase space) for a given system with 'mkPhase'.
+-- configuration space to phase space) for a given system with 'toPhase'.
 -- This allows you to state your system in configuration space and then
 -- convert it to phase space before handing it off to the hamiltonian
 -- machinery.
@@ -54,6 +59,9 @@ data Config :: Nat -> Type where
            , cfgVel :: !(R n)
            }
         -> Config n
+  deriving (Generic)
+
+deriving instance KnownNat n => Show (Config n)
 
 -- | Represents the full state of a system of @n@ generalized coordinates
 -- in phase space (informally, "positions and momentums").
@@ -70,7 +78,7 @@ data Config :: Nat -> Type where
 -- simulation.  However, configuration space representations are much more
 -- understandable to humans, so it might be useful to give an initial state
 -- in configuration space using 'Config', and then convert it to a 'Phase'
--- with 'mkPhase'.
+-- with 'toPhase'.
 data Phase :: Nat -> Type where
     Phs :: { -- | The current values ("positions") of each of the @n@
              -- generalized coordinates.
@@ -80,6 +88,9 @@ data Phase :: Nat -> Type where
            , phsMom :: !(R n)
            }
         -> Phase n
+  deriving (Generic)
+
+deriving instance KnownNat n => Show (Phase n)
 
 -- TODO: cache inverses, JMJs?
 
@@ -144,7 +155,7 @@ mkSystem
     -> System m n
 mkSystem m f u = Sys m
                      (vec2r . f . r2vec)
-                     (vec2l . jacobian f . r2vec)
+                     (tr . vec2l . jacobianT f . r2vec)
                      (fmap (sym . vec2l . j2 . C.hoistCofree VG.convert)
                         . VG.convert
                         . jacobians f
@@ -177,12 +188,12 @@ momenta Sys{..} Cfg{..} = tr j #> diag sysMass #> j #> cfgVel
 -- representation.  This allows you to state your starting state in
 -- configuration space and convert to phase space for your simulation to
 -- use.
-mkPhase
+toPhase
     :: (KnownNat m, KnownNat n)
     => System m n
     -> Config n
     -> Phase n
-mkPhase s = Phs <$> cfgPos <*> momenta s
+toPhase s = Phs <$> cfgPos <*> momenta s
 
 -- | The kinetic energy of a system, given the system's state in
 -- configuration space.
@@ -220,7 +231,7 @@ velocities Sys{..} Phs{..} = inv jmj #> phsMom
     j   = sysJacobian phsPos
     jmj = tr j <> diag sysMass <> j
 
--- | Invert 'mkPhase' and convert a description of a system's state in
+-- | Invert 'toPhase' and convert a description of a system's state in
 -- phase space to a description of the system's state in configuration
 -- space.
 --
@@ -255,3 +266,30 @@ hamiltonian s = do
     t <- keP s
     u <- sysPotential s . sysCoords s . phsPos
     return (t + u)
+
+hamEqs
+    :: (KnownNat m, KnownNat n)
+    => System m n
+    -> Phase n
+    -> (R n, R n)
+hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
+  where
+    mm   = diag sysMass
+    j    = sysJacobian phsPos
+    trj  = tr j
+    j'   = unSym <$> sysJacobian2 phsPos
+    jmj  = trj <> mm <> j
+    ijmj = inv jmj
+    dTdq = vec2r
+         . flip fmap (tr2 j') $ \djdq ->
+             (phsMom <.> tr ijmj #> tr djdq #> mm #> djdq #> ijmj #> phsMom) / 2
+    dHdp = ijmj #> phsMom
+    dHdq = dTdq + trj #> sysPotentialGrad (sysCoords phsPos)
+
+tr2
+    :: (KnownNat m, KnownNat n, KnownNat o)
+    => V.Vector m (L n o)
+    -> V.Vector n (L m o)
+tr2 = fmap (fromJust . (\rs -> withRows rs exactDims) . toList)
+    . sequenceA
+    . fmap (fromJust . V.fromList . toRows)
