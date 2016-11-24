@@ -16,7 +16,6 @@ module Numeric.Hamilton
   , Phase(..)
   , mkSystem
   , underlyingPos
-  , underlyingInertia
   , pe
   , toPhase
   , fromPhase
@@ -128,21 +127,30 @@ data System :: Nat -> Nat -> Type where
            }
         -> System m n
 
+-- | Converts the position of generalized coordinates of a system to the
+-- coordinates of the system's underlying cartesian coordinate system.
+-- Useful for plotting/drawing the system in cartesian space.
 underlyingPos
     :: System m n
     -> R n
     -> R m
 underlyingPos = _sysCoords
 
-underlyingInertia
+-- | The potential energy of a system, given the position in the underlying
+-- cartesian coordinate space of the system.  Useful for plotting/drawing
+-- the system's potential energy function in cartesian space.
+underlyingPE
     :: System m n
     -> R m
-underlyingInertia = _sysInertia
+    -> Double
+underlyingPE = _sysPotential
 
+-- | The potential energy of a system, given the position in the
+-- generalized coordinates of the system.
 pe  :: System m n
     -> R n
     -> Double
-pe s = _sysPotential s . underlyingPos s
+pe s = underlyingPE s . underlyingPos s
 
 vec2r
     :: KnownNat n => V.Vector n Double -> R n
