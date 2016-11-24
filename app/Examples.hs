@@ -1,32 +1,66 @@
+{-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE DeriveFoldable  #-}
 {-# LANGUAGE DeriveFunctor   #-}
+{-# LANGUAGE GADTs           #-}
 {-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE ViewPatterns    #-}
 
+-- import           Data.Fixed
+-- import           Data.Foldable
 import           Control.Concurrent
 import           Control.Monad
-import           Data.Fixed
-import           Numeric
-import           Graphics.Vty
+import           Data.Maybe
+import           GHC.TypeLits
+import           Graphics.Vty hiding          (Config)
+import           Numeric.Hamilton
+import           Numeric.LinearAlgebra.Static
 import           System.Exit
 import           Text.Printf
-
-data Stream a = a :< Stream a
-  deriving (Functor, Foldable)
+import qualified Data.Vector.Sized            as V
+import qualified Data.Vector.Storable         as VS
 
 fps :: Double
 fps = 20
+
+pendulum :: SysExample
+pendulum = SE s f (toPhase s c0)
+  where
+    s :: System 2 1
+    s = mkSystem (vec2 1 1) (fromJust . V.fromList . (\θ -> [cos θ, sin θ]) . V.head) (`V.unsafeIndex` 1)
+    f :: R 2 -> Point Double
+    f = (\[x,y] -> Pt x y) . VS.toList . extract
+    c0 :: Config 1
+    c0 = Cfg (vector [-pi/4]) (vector [0])
+
+data SysExample where
+    SE :: (KnownNat m, KnownNat n)
+       => { seSystem :: System m n
+          , seDraw   :: R m -> Point Double
+          , seInit   :: Phase n
+          }
+       -> SysExample
 
 main :: IO ()
 main = do
     cfg <- standardIOConfig
     vty <- mkVty cfg
 
-    t <- forkIO . forM_ (stream succ 0) $ \i -> do
+    SE{..} <- return pendulum
+    -- let f r p = evolveHam' seSystem p [0, r] !! 1
+    let f r = (!! 100) . iterate (stepHam (r / 100) seSystem)
+
+    t <- forkIO . forM_ (iterate (f (1/fps)) seInit) $ \p -> do
+      let pt  = seDraw . underlyingPos seSystem . phsPos $ p
       dr <- displayBounds $ outputIface vty
-      update vty . picForLayers $
-        plot dr (PX (-5, 5) (RR 0.5 2)) [(Pt (-5 + (i / 20) `mod'` 10) 1, '*')]
+      let disp = vertCat [ string mempty . printf "%.5f" . head . VS.toList . extract . phsPos $ p
+                         , string mempty . printf "%.5f" . keP seSystem $ p
+                         , string mempty . printf "%.5f" . pe seSystem . phsPos $ p
+                         , string mempty . printf "%.5f" . hamiltonian seSystem $ p
+                         ]
+      update vty . picForLayers . (disp:) $
+        plot dr (PX (-2, 2) (RR 0.5 2)) [(pt, '*')]
       threadDelay (round (1000000 / fps))
 
     forever $ do
@@ -62,7 +96,9 @@ plot
     -> PlotRange
     -> [(Point Double, Char)] -- ^ points to plot
     -> [Image]
-plot (wd,ht) pr = (++ bgs) . map (\(p, c) -> place EQ EQ p $ char mempty c)
+plot (wd,ht) pr = map (crop wd ht)
+                . (++ bgs)
+                . map (\(p, c) -> place EQ EQ p $ char mempty c)
   where
     wd' = fromIntegral wd
     ht' = fromIntegral ht
@@ -107,20 +143,3 @@ mkRange (wd, ht) = \case
       let xr = (uncurry (-) yb) * wd / ht / rrRatio
           x0 = (rrZero - 1) * xr
       in  ((x0, x0 + xr), yb)
-
-
-unfold
-    :: (s -> (a, s))
-    -> s
-    -> Stream a
-unfold f = go
-  where
-    go s = x :< go s'
-      where
-        (x, s') = f s
-
-stream
-    :: (a -> a)
-    -> a
-    -> Stream a
-stream f = unfold (\s -> (s, f s))
