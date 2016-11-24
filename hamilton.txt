@@ -2,9 +2,10 @@
 -- See Hoogle, http://www.haskell.org/hoogle/
 
 
--- | Initial project template from stack
+-- | Physics on generalized coordinate systems using Hamiltonian Mechanics
 --   
---   Please see README.md
+--   Please see README.md (or read online at
+--   <a>https://github.com/mstksg/hamilton#readme</a>)
 @package hamilton
 @version 0.1.0.0
 
@@ -146,7 +147,7 @@ evolveHam :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s) => Syste
 --   Desired solution times provided as a list instead of a sized
 --   <a>Vector</a>. The output list should be the same length as the input
 --   list.
-evolveHam' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Phase n -> NonEmpty Double -> NonEmpty (Phase n)
+evolveHam' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Phase n -> [Double] -> [Phase n]
 
 -- | A convenience wrapper for <a>evolveHam</a> that works on configuration
 --   space states instead of phase space states.
@@ -162,7 +163,7 @@ evolveHamC :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s) => Syst
 --   Note that the simulation itself still runs in phase space; this
 --   function just abstracts over converting to and from phase space for
 --   the inputs and outputs.
-evolveHamC' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Config n -> NonEmpty Double -> NonEmpty (Config n)
+evolveHamC' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Config n -> [Double] -> [Config n]
 instance GHC.Generics.Generic (Numeric.Hamilton.Phase a)
 instance GHC.Generics.Generic (Numeric.Hamilton.Config a)
 instance GHC.TypeLits.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Config n)
