@@ -43,10 +43,13 @@ through time, without needing to do any simulation involving
 stuff like that.  All you need is a description of your coordinate system
 itself, and the potential energy!
 
-[Hamiltonian mechanics]() lets you express your system parameterized by
-arbitrary coordinates and gives you equations of motions as first-order
-differential equations.  This library solves those first-order differential
-equations for you using automatic differentiation and some matrix manipulation.
+Thanks to [~~Alexander~~ William Rowan Hamilton][WRH], we can express our
+system parameterized by arbitrary coordinates and get back equations of motions
+as first-order differential equations.  This library solves those first-order
+differential equations for you using automatic differentiation and some matrix
+manipulation.
+
+[WRH]: https://www.youtube.com/watch?v=SZXHoWwBcDc
 
 See [documentation][] and [example runner][].
 
