@@ -1,11 +1,13 @@
-{-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE DeriveFoldable  #-}
-{-# LANGUAGE DeriveFunctor   #-}
-{-# LANGUAGE GADTs           #-}
-{-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections   #-}
-{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DeriveFoldable       #-}
+{-# LANGUAGE DeriveFunctor        #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE RecordWildCards      #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE ViewPatterns         #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- import           Data.Fixed
 -- import           Data.Foldable
@@ -25,16 +27,20 @@ import qualified Data.Map.Strict                     as M
 import qualified Data.Vector.Sized                   as V
 import qualified Data.Vector.Storable                as VS
 
+deriving instance Ord Color
+
 data SysExample where
     SE :: (KnownNat m, KnownNat n)
-       => { seSystem :: System m n
+       => { seName   :: String
+          , seCoords :: V.Vector n String
+          , seSystem :: System m n
           , seDraw   :: R m -> [Point Double]
           , seInit   :: Phase n
           }
        -> SysExample
 
 pendulum :: SysExample
-pendulum = SE s f (toPhase s c0)
+pendulum = SE "Single pendulum" (V.singleton "θ") s f (toPhase s c0)
   where
     s :: System 2 1
     s = mkSystem (vec2 1 1) (fromJust . V.fromList . (\θ -> [sin θ, -cos θ]) . V.head) (`V.unsafeIndex` 1)
@@ -43,13 +49,14 @@ pendulum = SE s f (toPhase s c0)
     c0 :: Config 1
     c0 = Cfg (vector [0]) (vector [1])
 
-doublePendulum :: Double -> Double -> SysExample
-doublePendulum m1 m2 = SE s f (toPhase s c0)
+doublePendulum :: Double -> Double -> Double -> SysExample
+doublePendulum m1 m2 g = SE "Double pendulum" cs s f (toPhase s c0)
   where
+    cs = fromJust . V.fromList $ ["θ1", "θ2"]
     s :: System 4 2
     s = mkSystem (vec4 m1 m1 m2 m2)
-                 (fromJust . V.fromList . (\[θ1, θ2] -> [sin θ1, -cos θ1, sin θ1 + sin θ2, -cos θ1 - cos θ2]) . V.toList)
-                 ((\[_, y1, _, y2] -> realToFrac m1 * y1 + realToFrac m2 * y2) . V.toList)
+                 (fromJust . V.fromList . (\[θ1, θ2] -> [sin θ1, -cos θ1, sin θ1 + sin θ2/2, -cos θ1 - cos θ2/2]) . V.toList)
+                 ((\[_, y1, _, y2] -> realToFrac g * (realToFrac m1 * y1 + realToFrac m2 * y2)) . V.toList)
     f :: R 4 -> [Point Double]
     f = (\[x1,y1,x2,y2] -> [Pt x1 y1, Pt x2 y2]) . VS.toList . extract
     c0 :: Config 2
@@ -75,7 +82,7 @@ main = do
     opts <- newIORef $ SO 0.5 1 25
 
     -- t <- forkIO $ loop vty opts pendulum
-    t <- forkIO $ loop vty opts (doublePendulum 3 1)
+    t <- forkIO $ loop vty opts (doublePendulum 1 1 5)
 
     forever $ do
       e <- nextEvent vty
@@ -95,31 +102,41 @@ main = do
     fps = 12
     screenRatio :: Double
     screenRatio = 2.1
-    ptChars = cycle "o*+~"
+    ptAttrs :: [(Char, Color)]
+    ptAttrs  = ptChars `zip` ptColors
+      where
+        ptColors = cycle [white,yellow,blue,red,green]
+        ptChars  = cycle "o*+~"
     loop :: Vty -> IORef SimOpts -> SysExample -> IO ()
     loop vty oRef SE{..} = go M.empty seInit
       where
+        qVec = intercalate ", " . V.toList $ seCoords
         go hists p = do
           SO{..} <- readIORef oRef
           let xb   = (- recip soZoom, recip soZoom)
               p'   = evolveHam' seSystem p [0, soRate/fps] !! 1
               info = vertCat . map (string defAttr) $
-                       [ printf "q: <%s>" . intercalate ", "
+                       [ printf "[ %s ]" seName
+                       , printf "<%s>: <%s>" qVec . intercalate ", "
                           . map (printf "%.5f") . VS.toList . extract . phsPos $ p
-                       , printf "T: %.5f" . keP seSystem $ p
-                       , printf "U: %.5f" . pe seSystem . phsPos $ p
+                       , printf "KE: %.5f" . keP seSystem $ p
+                       , printf "PE: %.5f" . pe seSystem . phsPos $ p
                        , printf "H: %.5f" . hamiltonian seSystem $ p
                        , " "
-                       , printf "r: x%.2f" $ soRate
-                       , printf "h: %d"    $ soHist
+                       , printf "rate: x%.2f" $ soRate
+                       , printf "hist: %d"    $ soHist
                        ]
-              pts  = (`zip` ptChars) . seDraw . underlyingPos seSystem . phsPos
+              pts  = (`zip` ptAttrs) . seDraw . underlyingPos seSystem . phsPos
                    $ p
-              hists' = foldl' (\h (r, c) -> M.insertWith (addHist soHist) c [r] h) hists pts
+              hists' = foldl' (\h (r, a) -> M.insertWith (addHist soHist) a [r] h) hists pts
           dr <- displayBounds $ outputIface vty
           update vty . picForLayers . (info:) . plot dr (PX xb (RR 0.5 screenRatio)) $
-               (second (withStyle defAttr bold,) <$> pts)
-            ++ (map (\(_,r) -> (r, (defAttr, '.'))) . concatMap sequence . M.toList $ hists')
+               ((second . second) (defAttr `withForeColor`) <$> pts)
+            ++ (map (\((_,c),r) -> (r, ('.', defAttr `withForeColor` c)))
+                  . concatMap sequence
+                  . M.toList
+                  $ hists'
+               )
           threadDelay (round (1000000 / fps))
           go hists' p'
     addHist hl new old = take hl (new ++ old)
@@ -157,11 +174,11 @@ data PlotRange = PXY (Double, Double) (Double, Double)
 plot
     :: (Int, Int)               -- ^ display bounds
     -> PlotRange
-    -> [(Point Double, (Attr, Char))]   -- ^ points to plot
+    -> [(Point Double, (Char, Attr))]   -- ^ points to plot
     -> [Image]
 plot (wd,ht) pr = map (crop wd ht)
                 . (++ bgs)
-                . map (\(p, (a, c)) -> place EQ EQ p $ char a c)
+                . map (\(p, (c, a)) -> place EQ EQ p $ char a c)
   where
     wd' = fromIntegral wd
     ht' = fromIntegral ht
