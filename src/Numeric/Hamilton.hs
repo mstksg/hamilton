@@ -8,6 +8,7 @@
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeInType          #-}
+{-# LANGUAGE TypeOperators       #-}
 {-# LANGUAGE ViewPatterns        #-}
 
 module Numeric.Hamilton
@@ -16,6 +17,7 @@ module Numeric.Hamilton
   , Phase(..)
   , mkSystem
   , underlyingPos
+  , underlyingPE
   , pe
   , toPhase
   , fromPhase
@@ -39,13 +41,16 @@ import           Data.Foldable
 import           Data.Kind
 import           Data.Maybe
 import           Data.Proxy
+import           Data.Type.Equality hiding    (sym)
 import           GHC.Generics                 (Generic)
 import           GHC.TypeLits
+import           GHC.TypeLits.Compare
 import           Numeric.AD
 import           Numeric.GSL.ODE
 import           Numeric.LinearAlgebra.Static
 import qualified Control.Comonad              as C
 import qualified Control.Comonad.Cofree       as C
+import qualified Data.List.NonEmpty           as NE
 import qualified Data.Vector.Generic.Sized    as VG
 import qualified Data.Vector.Sized            as V
 import qualified Numeric.LinearAlgebra        as LA
@@ -309,6 +314,10 @@ hamiltonian s = do
     u <- pe s . phsPos
     return (t + u)
 
+-- | The "hamiltonian equations" for a given system at a given state in
+-- phase space.  Returns the rate of change of the positions and
+-- conjugate momenta, which can be used to progress the simulation through
+-- time.
 hamEqs
     :: (KnownNat m, KnownNat n)
     => System m n
@@ -324,20 +333,9 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     ijmj = inv jmj
     dTdq = vec2r
          . flip fmap (tr2 j') $ \djdq ->
-             -phsMom <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMom 
+             -phsMom <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMom
     dHdp = ijmj #> phsMom
     dHdq = dTdq + trj #> _sysPotentialGrad (_sysCoords phsPos)
-    -- dHdq = trj #> _sysPotentialGrad (_sysCoords phsPos)
-
-stepHam
-    :: (KnownNat m, KnownNat n)
-    => Double
-    -> System m n
-    -> Phase n
-    -> Phase n
-stepHam r s p@Phs{..} = Phs (phsPos + konst r * dq) (phsMom + konst r * dp)
-  where
-    (dq, dp) = hamEqs s p
 
 tr2
     :: (KnownNat m, KnownNat n, KnownNat o)
@@ -346,6 +344,16 @@ tr2
 tr2 = fmap (fromJust . (\rs -> withRows rs exactDims) . toList)
     . sequenceA
     . fmap (fromJust . V.fromList . toRows)
+
+-- | Step a system through phase space over over a single timestep.
+stepHam
+    :: forall m n. (KnownNat m, KnownNat n)
+    => Double
+    -> System m n
+    -> Phase n
+    -> Phase n
+stepHam r s p = evolveHam @m @n @2 s p (fromJust $ V.fromList [0, r])
+                  `V.unsafeIndex` 1
 
 -- | Evolve a system using a hamiltonian stepper, with the given initial
 -- phase space state.
@@ -356,14 +364,24 @@ evolveHam'
     :: forall m n. (KnownNat m, KnownNat n)
     => System m n
     -> Phase n
-    -> [Double]
-    -> [Phase n]
-evolveHam' s p0 ts = V.withSizedList ts (toList . evolveHam s p0)
+    -> NE.NonEmpty Double
+    -> NE.NonEmpty (Phase n)
+evolveHam' s p0 ts = V.withSizedList (toList ts') $ \(v :: V.Vector s Double) ->
+                       case (Proxy %<=? Proxy) :: (2 :<=? s) of
+                         LE Refl -> NE.fromList
+                                  . (if l1 then tail else id)
+                                  . toList
+                                  $ evolveHam s p0 v
+                         NLE Refl -> error "evolveHam': Internal error"
+  where
+    (l1, ts') = case ts of
+      x NE.:| [] -> (True , 0 NE.:| [x])
+      _          -> (False, ts      )
 
 -- | Evolve a system using a hamiltonian stepper, with the given initial
 -- phase space state.
 evolveHam
-    :: forall m n s. (KnownNat m, KnownNat n, KnownNat s)
+    :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s)
     => System m n           -- ^ system to simulate
     -> Phase n              -- ^ initial state, in phase space
     -> V.Vector s Double    -- ^ desired solution times
@@ -371,8 +389,7 @@ evolveHam
 evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
                   $ odeSolveV RKf45 hi eps eps (const f) (fromPs p0) ts'
   where
-    hi  | V.length ts == 1 = V.unsafeIndex ts 0 / 100
-        | otherwise        = (V.unsafeIndex ts 1 - V.unsafeIndex ts 0) / 100
+    hi  = (V.unsafeIndex ts 1 - V.unsafeIndex ts 0) / 100
     eps = 1.49012e-08
     f :: LA.Vector Double -> LA.Vector Double
     f   = uncurry (\p m -> LA.vjoin [p,m])
@@ -396,8 +413,8 @@ evolveHamC'
     :: forall m n. (KnownNat m, KnownNat n)
     => System m n           -- ^ system to simulate
     -> Config n             -- ^ initial state, in configuration space
-    -> [Double]             -- ^ desired solution times
-    -> [Config n]
+    -> NE.NonEmpty Double   -- ^ desired solution times
+    -> NE.NonEmpty (Config n)
 evolveHamC' s c0 = fmap (fromPhase s) . evolveHam' s (toPhase s c0)
 
 -- | A convenience wrapper for 'evolveHam' that works on configuration
@@ -407,7 +424,7 @@ evolveHamC' s c0 = fmap (fromPhase s) . evolveHam' s (toPhase s c0)
 -- just abstracts over converting to and from phase space for the inputs
 -- and outputs.
 evolveHamC
-    :: forall m n s. (KnownNat m, KnownNat n, KnownNat s)
+    :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s)
     => System m n           -- ^ system to simulate
     -> Config n             -- ^ initial state, in configuration space
     -> V.Vector s Double    -- ^ desired solution times

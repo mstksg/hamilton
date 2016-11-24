@@ -22,6 +22,7 @@ library
                      , free
                      , hmatrix >= 0.18
                      , hmatrix-gsl >= 0.18
+                     , typelits-witnesses
                      , vector-sized
   ghc-options:         -Wall
   default-language:    Haskell2010

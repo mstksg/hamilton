@@ -114,7 +114,7 @@ main = do
         go hists p = do
           SO{..} <- readIORef oRef
           let xb   = (- recip soZoom, recip soZoom)
-              p'   = evolveHam' seSystem p [0, soRate/fps] !! 1
+              p'   = stepHam (soRate / fps) seSystem p
               info = vertCat . map (string defAttr) $
                        [ printf "[ %s ]" seName
                        , printf "<%s>: <%s>" qVec . intercalate ", "
