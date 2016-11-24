@@ -17,7 +17,7 @@ module Numeric.Hamilton
     -- ** Systems
     System
   , mkSystem
-    -- *** Utility functions for plotting
+    -- *** Plotting functions
   , underlyingPos
   , underlyingPE
     -- ** States
@@ -57,7 +57,6 @@ import           Numeric.GSL.ODE
 import           Numeric.LinearAlgebra.Static
 import qualified Control.Comonad              as C
 import qualified Control.Comonad.Cofree       as C
-import qualified Data.List.NonEmpty           as NE
 import qualified Data.Vector.Generic.Sized    as VG
 import qualified Data.Vector.Sized            as V
 import qualified Numeric.LinearAlgebra        as LA
@@ -364,9 +363,9 @@ tr2 = fmap (fromJust . (\rs -> withRows rs exactDims) . toList)
 -- | Step a system through phase space over over a single timestep.
 stepHam
     :: forall m n. (KnownNat m, KnownNat n)
-    => Double
-    -> System m n
-    -> Phase n
+    => Double           -- ^ timestep to step through
+    -> System m n       -- ^ system to simulate
+    -> Phase n          -- ^ initial state, in phase space
     -> Phase n
 stepHam r s p = evolveHam @m @n @2 s p (fromJust $ V.fromList [0, r])
                   `V.unsafeIndex` 1
@@ -378,21 +377,21 @@ stepHam r s p = evolveHam @m @n @2 s p (fromJust $ V.fromList [0, r])
 -- The output list should be the same length as the input list.
 evolveHam'
     :: forall m n. (KnownNat m, KnownNat n)
-    => System m n
-    -> Phase n
-    -> NE.NonEmpty Double
-    -> NE.NonEmpty (Phase n)
+    => System m n  -- ^ system to simulate
+    -> Phase n     -- ^ initial state, in phase space
+    -> [Double]    -- ^ desired solution times
+    -> [Phase n]
+evolveHam' _ _ [] = []
 evolveHam' s p0 ts = V.withSizedList (toList ts') $ \(v :: V.Vector s Double) ->
                        case (Proxy %<=? Proxy) :: (2 :<=? s) of
-                         LE Refl -> NE.fromList
-                                  . (if l1 then tail else id)
+                         LE Refl -> (if l1 then tail else id)
                                   . toList
                                   $ evolveHam s p0 v
                          NLE Refl -> error "evolveHam': Internal error"
   where
     (l1, ts') = case ts of
-      x NE.:| [] -> (True , 0 NE.:| [x])
-      _          -> (False, ts      )
+      [x] -> (True , [0,x])
+      _   -> (False, ts   )
 
 -- | Evolve a system using a hamiltonian stepper, with the given initial
 -- phase space state.
@@ -427,10 +426,10 @@ evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
 -- and outputs.
 evolveHamC'
     :: forall m n. (KnownNat m, KnownNat n)
-    => System m n           -- ^ system to simulate
-    -> Config n             -- ^ initial state, in configuration space
-    -> NE.NonEmpty Double   -- ^ desired solution times
-    -> NE.NonEmpty (Config n)
+    => System m n       -- ^ system to simulate
+    -> Config n         -- ^ initial state, in configuration space
+    -> [Double]         -- ^ desired solution times
+    -> [Config n]
 evolveHamC' s c0 = fmap (fromPhase s) . evolveHam' s (toPhase s c0)
 
 -- | A convenience wrapper for 'evolveHam' that works on configuration
