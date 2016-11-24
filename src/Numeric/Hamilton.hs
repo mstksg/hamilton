@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -131,6 +132,19 @@ data System :: Nat -> Nat -> Type where
            , _sysPotentialGrad :: R m -> R m
            }
         -> System m n
+
+-- coordShift
+--     :: (KnownNat m, KnownNat n, KnownNat o)
+--     => (R o -> R n)
+--     -> (R o -> L n o)
+--     -> (R o -> V.Vector n (Sym o))
+--     -> System m n
+--     -> System m o
+-- coordShift c j j2 = \case
+--     Sys i c0 j0 j20 p g -> Sys i (c0 . c)
+--                                ((<>) <$> j0 . c <*> j)
+--                                ((\d -> fmap _) <$> j2 <*> j20 . c)
+--                                p g
 
 -- | Converts the position of generalized coordinates of a system to the
 -- coordinates of the system's underlying cartesian coordinate system.
