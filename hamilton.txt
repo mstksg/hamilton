@@ -37,7 +37,7 @@ data System :: Nat -> Nat -> Type
 --   
 --   You can convert a <tt><a>Config</a> n</tt> into a <tt><a>Phase</a>
 --   n</tt> (convert from configuration space to phase space) for a given
---   system with <a>mkPhase</a>. This allows you to state your system in
+--   system with <a>toPhase</a>. This allows you to state your system in
 --   configuration space and then convert it to phase space before handing
 --   it off to the hamiltonian machinery.
 data Config :: Nat -> Type
@@ -58,7 +58,7 @@ data Config :: Nat -> Type
 --   simulation. However, configuration space representations are much more
 --   understandable to humans, so it might be useful to give an initial
 --   state in configuration space using <a>Config</a>, and then convert it
---   to a <a>Phase</a> with <a>mkPhase</a>.
+--   to a <a>Phase</a> with <a>toPhase</a>.
 data Phase :: Nat -> Type
 [Phs] :: {phsPos :: !(R n)  The current values ("positions") of each of the @n@ generalized coordinates., phsMom :: !(R n)  The current conjugate momenta ("momentums") to each of the @n@ generalized coordinates} -> Phase n
 
@@ -73,6 +73,12 @@ data Phase :: Nat -> Type
 --   cartesian coordinate space.
 mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat a => Vector n a -> Vector m a) -> (forall a. RealFloat a => Vector m a -> a) -> System m n
 
+-- | Converts the position of generalized coordinates of a system to the
+--   coordinates of the system's underlying cartesian coordinate system.
+--   Useful for plotting/drawing the system in cartesian space.
+underlyingPos :: System m n -> R n -> R m
+pe :: System m n -> R n -> Double
+
 -- | Convert a configuration-space representaiton of the state of the
 --   system to a phase-space representation.
 --   
@@ -81,9 +87,9 @@ mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat 
 --   and intuitive representation. This allows you to state your starting
 --   state in configuration space and convert to phase space for your
 --   simulation to use.
-mkPhase :: (KnownNat m, KnownNat n) => System m n -> Config n -> Phase n
+toPhase :: (KnownNat m, KnownNat n) => System m n -> Config n -> Phase n
 
--- | Invert <a>mkPhase</a> and convert a description of a system's state in
+-- | Invert <a>toPhase</a> and convert a description of a system's state in
 --   phase space to a description of the system's state in configuration
 --   space.
 --   
@@ -116,3 +122,37 @@ lagrangian :: (KnownNat m, KnownNat n) => System m n -> Config n -> Double
 -- | The Hamiltonian of a system (the sum of kinetic energy and the
 --   potential energy), given the system's state in phase space.
 hamiltonian :: (KnownNat m, KnownNat n) => System m n -> Phase n -> Double
+hamEqs :: (KnownNat m, KnownNat n) => System m n -> Phase n -> (R n, R n)
+stepHam :: (KnownNat m, KnownNat n) => Double -> System m n -> Phase n -> Phase n
+
+-- | Evolve a system using a hamiltonian stepper, with the given initial
+--   phase space state.
+evolveHam :: forall m n s. (KnownNat m, KnownNat n, KnownNat s) => System m n -> Phase n -> Vector s Double -> Vector s (Phase n)
+
+-- | Evolve a system using a hamiltonian stepper, with the given initial
+--   phase space state.
+--   
+--   Desired solution times provided as a list instead of a sized
+--   <a>Vector</a>. The output list should be the same length as the input
+--   list.
+evolveHam' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Phase n -> [Double] -> [Phase n]
+
+-- | A convenience wrapper for <a>evolveHam</a> that works on configuration
+--   space states instead of phase space states.
+--   
+--   Note that the simulation itself still runs in phase space; this
+--   function just abstracts over converting to and from phase space for
+--   the inputs and outputs.
+evolveHamC :: forall m n s. (KnownNat m, KnownNat n, KnownNat s) => System m n -> Config n -> Vector s Double -> Vector s (Config n)
+
+-- | A convenience wrapper for <a>evolveHam'</a> that works on
+--   configuration space states instead of phase space states.
+--   
+--   Note that the simulation itself still runs in phase space; this
+--   function just abstracts over converting to and from phase space for
+--   the inputs and outputs.
+evolveHamC' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Config n -> [Double] -> [Config n]
+instance GHC.Generics.Generic (Numeric.Hamilton.Phase a)
+instance GHC.Generics.Generic (Numeric.Hamilton.Config a)
+instance GHC.TypeLits.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Config n)
+instance GHC.TypeLits.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Phase n)
