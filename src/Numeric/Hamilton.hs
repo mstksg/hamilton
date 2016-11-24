@@ -324,9 +324,11 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     ijmj = inv jmj
     dTdq = vec2r
          . flip fmap (tr2 j') $ \djdq ->
-             (phsMom <.> tr ijmj #> tr djdq #> mm #> djdq #> ijmj #> phsMom) / 2
+             -- (phsMom <.> ijmj #> tr djdq #> mm #> djdq #> ijmj #> phsMom) / 2
+             phsMom <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMom
     dHdp = ijmj #> phsMom
     dHdq = dTdq + trj #> _sysPotentialGrad (_sysCoords phsPos)
+    -- dHdq = trj #> _sysPotentialGrad (_sysCoords phsPos)
 
 stepHam
     :: (KnownNat m, KnownNat n)

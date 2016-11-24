@@ -11,71 +11,120 @@
 -- import           Data.Foldable
 import           Control.Concurrent
 import           Control.Monad
+import           Data.Bifunctor
+import           Data.IORef
+import           Data.List
 import           Data.Maybe
 import           GHC.TypeLits
-import           Graphics.Vty hiding          (Config)
+import           Graphics.Vty hiding                 (Config)
 import           Numeric.Hamilton
-import           Numeric.LinearAlgebra.Static
+import           Numeric.LinearAlgebra.Static hiding (dim)
 import           System.Exit
 import           Text.Printf
-import qualified Data.Vector.Sized            as V
-import qualified Data.Vector.Storable         as VS
+import qualified Data.Map.Strict                     as M
+import qualified Data.Vector.Sized                   as V
+import qualified Data.Vector.Storable                as VS
 
-fps :: Double
-fps = 20
+data SysExample where
+    SE :: (KnownNat m, KnownNat n)
+       => { seSystem :: System m n
+          , seDraw   :: R m -> [Point Double]
+          , seInit   :: Phase n
+          }
+       -> SysExample
 
 pendulum :: SysExample
 pendulum = SE s f (toPhase s c0)
   where
     s :: System 2 1
-    s = mkSystem (vec2 1 1) (fromJust . V.fromList . (\θ -> [cos θ, sin θ]) . V.head) (`V.unsafeIndex` 1)
-    f :: R 2 -> Point Double
-    f = (\[x,y] -> Pt x y) . VS.toList . extract
+    s = mkSystem (vec2 1 1) (fromJust . V.fromList . (\θ -> [sin θ, -cos θ]) . V.head) (`V.unsafeIndex` 1)
+    f :: R 2 -> [Point Double]
+    f = (:[]) . (\[x,y] -> Pt x y) . VS.toList . extract
     c0 :: Config 1
-    c0 = Cfg (vector [-pi/4]) (vector [0])
+    c0 = Cfg (vector [0]) (vector [1])
 
-data SysExample where
-    SE :: (KnownNat m, KnownNat n)
-       => { seSystem :: System m n
-          , seDraw   :: R m -> Point Double
-          , seInit   :: Phase n
-          }
-       -> SysExample
+data SimOpts = SO { soZoom :: Double
+                  , soRate :: Double
+                  , soHist :: Int
+                  }
+  deriving (Show)
+
+data SimEvt = SEQuit
+            | SEZoom Double
+            | SERate Double
+            | SEHist Int
 
 main :: IO ()
 main = do
     cfg <- standardIOConfig
     vty <- mkVty cfg
 
-    SE{..} <- return pendulum
-    -- let f r p = evolveHam' seSystem p [0, r] !! 1
-    let f r = (!! 100) . iterate (stepHam (r / 100) seSystem)
+    opts <- newIORef $ SO 0.5 1 15
 
-    t <- forkIO . forM_ (iterate (f (1/fps)) seInit) $ \p -> do
-      let pt  = seDraw . underlyingPos seSystem . phsPos $ p
-      dr <- displayBounds $ outputIface vty
-      let disp = vertCat [ string mempty . printf "%.5f" . head . VS.toList . extract . phsPos $ p
-                         , string mempty . printf "%.5f" . keP seSystem $ p
-                         , string mempty . printf "%.5f" . pe seSystem . phsPos $ p
-                         , string mempty . printf "%.5f" . hamiltonian seSystem $ p
-                         ]
-      update vty . picForLayers . (disp:) $
-        plot dr (PX (-2, 2) (RR 0.5 2)) [(pt, '*')]
-      threadDelay (round (1000000 / fps))
+    t <- forkIO $ loop vty opts pendulum
 
     forever $ do
       e <- nextEvent vty
-      when (quitter e) $ do
-        killThread t
-        shutdown vty
-        exitSuccess
+      forM_ (processEvt e) $ \case
+        SEQuit -> do
+          killThread t
+          shutdown vty
+          exitSuccess
+        SEZoom s ->
+          modifyIORef opts $ \o -> o { soZoom = soZoom o * s }
+        SERate r ->
+          modifyIORef opts $ \o -> o { soRate = soRate o * r }
+        SEHist h ->
+          modifyIORef opts $ \o -> o { soHist = soHist o + h }
+  where
+    fps :: Double
+    fps = 12
+    screenRatio :: Double
+    screenRatio = 2.1
+    ptChars = cycle "o*+~"
+    loop :: Vty -> IORef SimOpts -> SysExample -> IO ()
+    loop vty oRef SE{..} = go M.empty seInit
+      where
+        go hists p = do
+          SO{..} <- readIORef oRef
+          let xb   = (- recip soZoom, recip soZoom)
+              p'   = evolveHam' seSystem p [0, soRate/fps] !! 1
+              info = vertCat . map (string defAttr) $
+                       [ printf "q: <%s>" . intercalate ", "
+                          . map (printf "%.5f") . VS.toList . extract . phsPos $ p
+                       , printf "T: %.5f" . keP seSystem $ p
+                       , printf "U: %.5f" . pe seSystem . phsPos $ p
+                       , printf "H: %.5f" . hamiltonian seSystem $ p
+                       , " "
+                       , printf "r: x%.2f" $ soRate
+                       , printf "h: %d"    $ soHist
+                       ]
+              pts  = (`zip` ptChars) . seDraw . underlyingPos seSystem . phsPos
+                   $ p
+              hists' = foldl' (\h (r, c) -> M.insertWith (addHist soHist) c [r] h) hists pts
+          dr <- displayBounds $ outputIface vty
+          update vty . picForLayers . (info:) . plot dr (PX xb (RR 0.5 screenRatio)) $
+               (second (withStyle defAttr bold,) <$> pts)
+            ++ (map (\(_,r) -> (r, (defAttr, '.'))) . concatMap sequence . M.toList $ hists')
+          threadDelay (round (1000000 / fps))
+          go hists' p'
+    addHist hl new old = take hl (new ++ old)
 
-quitter :: Event -> Bool
-quitter = \case
-    EvKey KEsc        []      -> True
-    EvKey (KChar 'c') [MCtrl] -> True
-    EvKey (KChar 'q') []      -> True
-    _                         -> False
+processEvt
+    :: Event -> Maybe SimEvt
+processEvt = \case
+    EvKey KEsc        []      -> Just SEQuit
+    EvKey (KChar 'c') [MCtrl] -> Just SEQuit
+    EvKey (KChar 'q') []      -> Just SEQuit
+    EvKey (KChar '+') []      -> Just $ SEZoom 2
+    EvKey (KChar '-') []      -> Just $ SEZoom 0.5
+    EvKey (KChar '>') []      -> Just $ SERate 1.5
+    EvKey (KChar '<') []      -> Just $ SERate (1/1.5)
+    EvKey (KChar ']') []      -> Just $ SEHist 1
+    EvKey (KChar '[') []      -> Just $ SEHist (-1)
+    EvKey (KChar '}') []      -> Just $ SEHist 5
+    EvKey (KChar '{') []      -> Just $ SEHist (-5)
+    _                         -> Nothing
 
 data Point a = Pt { pX :: a, pY :: a }
              deriving (Show, Functor)
@@ -92,20 +141,20 @@ data PlotRange = PXY (Double, Double) (Double, Double)
                | PY  RangeRatio       (Double, Double)
 
 plot
-    :: (Int, Int)         -- ^ display bounds
+    :: (Int, Int)               -- ^ display bounds
     -> PlotRange
-    -> [(Point Double, Char)] -- ^ points to plot
+    -> [(Point Double, (Attr, Char))]   -- ^ points to plot
     -> [Image]
 plot (wd,ht) pr = map (crop wd ht)
                 . (++ bgs)
-                . map (\(p, c) -> place EQ EQ p $ char mempty c)
+                . map (\(p, (a, c)) -> place EQ EQ p $ char a c)
   where
     wd' = fromIntegral wd
     ht' = fromIntegral ht
     ((xmin, xmax), (ymin, ymax)) = mkRange (wd', ht') pr
-    origin = place EQ EQ (Pt 0 0) $ char mempty '+'
-    xaxis  = place EQ EQ (Pt 0 0) $ charFill mempty '-' wd 1
-    yaxis  = place EQ EQ (Pt 0 0) $ charFill mempty '|' 1 ht
+    origin = place EQ EQ (Pt 0 0) $ char defAttr '+'
+    xaxis  = place EQ EQ (Pt 0 0) $ charFill defAttr '-' wd 1
+    yaxis  = place EQ EQ (Pt 0 0) $ charFill defAttr '|' 1 ht
     xrange = xmax - xmin
     yrange = ymax - ymin
     bg     = backgroundFill wd ht
@@ -118,10 +167,10 @@ plot (wd,ht) pr = map (crop wd ht)
                     (fAlign aY (imageHeight i))
         . translate pX pY
         $ i
-    labels = [ place LT EQ (Pt xmin 0) . string mempty $ printf "%.2f" xmin
-             , place GT EQ (Pt xmax 0) . string mempty $ printf "%.2f" xmax
-             , place EQ LT (Pt 0 ymin) . string mempty $ printf "%.2f" ymin
-             , place EQ GT (Pt 0 ymax) . string mempty $ printf "%.2f" ymax
+    labels = [ place LT EQ (Pt xmin 0) . string defAttr $ printf "%.2f" xmin
+             , place GT EQ (Pt xmax 0) . string defAttr $ printf "%.2f" xmax
+             , place EQ LT (Pt 0 ymin) . string defAttr $ printf "%.2f" ymin
+             , place EQ GT (Pt 0 ymax) . string defAttr $ printf "%.2f" ymax
              ]
     bgs    = labels ++ [origin, xaxis, yaxis, bg]
     fAlign = \case
