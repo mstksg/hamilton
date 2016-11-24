@@ -18,13 +18,31 @@ module Numeric.Hamilton
 --   
 --   For the most part, you are supposed to be able to ignore <tt>m</tt>.
 --   <tt>m</tt> is only provided because it's useful when plotting/drawing
---   the system with a given state back in rectangular coordinates.
+--   the system with a given state back in rectangular coordinates. (The
+--   only functions that use the <tt>m</tt> at the moment are
+--   <a>underlyingPos</a> and <a>underlyingPE</a>)
 --   
 --   A <tt><a>System</a> m n</tt>'s state is described using a
 --   <tt><a>Config</a> n</tt> (which describes the system in configuration
 --   space) or a <tt><a>Phase</a> n</tt> (which describes the system in
 --   phase space).
 data System :: Nat -> Nat -> Type
+
+-- | Create a system with <tt>n</tt> generalized coordinates by describing
+--   its coordinate space (by a function from the generalized coordinates
+--   to the underlying cartesian coordinates), the inertia of each of those
+--   underlying coordinates, and the pontential energy function.
+mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat a => Vector n a -> Vector m a) -> (forall a. RealFloat a => Vector m a -> a) -> System m n
+
+-- | Converts the position of generalized coordinates of a system to the
+--   coordinates of the system's underlying cartesian coordinate system.
+--   Useful for plotting/drawing the system in cartesian space.
+underlyingPos :: System m n -> R n -> R m
+
+-- | The potential energy of a system, given the position in the underlying
+--   cartesian coordinate space of the system. Useful for plotting/drawing
+--   the system's potential energy function in cartesian space.
+underlyingPE :: System m n -> R m -> Double
 
 -- | Represents the full state of a system of <tt>n</tt> generalized
 --   coordinates in configuration space (informally, "positions and
@@ -62,31 +80,6 @@ data Config :: Nat -> Type
 data Phase :: Nat -> Type
 [Phs] :: {phsPos :: !(R n)  The current values ("positions") of each of the @n@ generalized coordinates., phsMom :: !(R n)  The current conjugate momenta ("momentums") to each of the @n@ generalized coordinates} -> Phase n
 
--- | Create a system with <tt>n</tt> generalized coordinates by providing
---   the underlying inertials, describing its coordinate space, and giving
---   pontential energy function.
---   
---   Given by describing some fundamental properties of the underlying
---   cartesian coordinate space of the system (the inertia of each
---   coordinate and the potential energy function), along with a conversion
---   function from the generalized coordinate space to the underlying
---   cartesian coordinate space.
-mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat a => Vector n a -> Vector m a) -> (forall a. RealFloat a => Vector m a -> a) -> System m n
-
--- | Converts the position of generalized coordinates of a system to the
---   coordinates of the system's underlying cartesian coordinate system.
---   Useful for plotting/drawing the system in cartesian space.
-underlyingPos :: System m n -> R n -> R m
-
--- | The potential energy of a system, given the position in the underlying
---   cartesian coordinate space of the system. Useful for plotting/drawing
---   the system's potential energy function in cartesian space.
-underlyingPE :: System m n -> R m -> Double
-
--- | The potential energy of a system, given the position in the
---   generalized coordinates of the system.
-pe :: System m n -> R n -> Double
-
 -- | Convert a configuration-space representaiton of the state of the
 --   system to a phase-space representation.
 --   
@@ -121,6 +114,10 @@ keC :: (KnownNat m, KnownNat n) => System m n -> Config n -> Double
 -- | The kinetic energy of a system, given the system's state in phase
 --   space.
 keP :: (KnownNat m, KnownNat n) => System m n -> Phase n -> Double
+
+-- | The potential energy of a system, given the position in the
+--   generalized coordinates of the system.
+pe :: System m n -> R n -> Double
 
 -- | The Lagrangian of a system (the difference between the kinetic energy
 --   and the potential energy), given the system's state in configuration
