@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFunctor        #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE PatternSynonyms      #-}
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TupleSections        #-}
@@ -40,23 +41,26 @@ data SysExample where
        -> SysExample
 
 pendulum :: SysExample
-pendulum = SE "Single pendulum" (V.singleton "θ") s f (toPhase s c0)
+pendulum = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
   where
     s :: System 2 1
-    s = mkSystem (vec2 1 1) (fromJust . V.fromList . (\θ -> [sin θ, -cos θ]) . V.head) (`V.unsafeIndex` 1)
+    s = mkSystem (vec2 1 1                        )
+                 (\(V1 θ)   -> V2 (sin θ) (-cos θ))
+                 (\(V2 _ y) -> y                  )
     f :: R 2 -> [Point Double]
-    f = (:[]) . (\[x,y] -> Pt x y) . VS.toList . extract
+    f = (\[x,y] -> [Pt x y]) . VS.toList . extract
     c0 :: Config 1
-    c0 = Cfg (vector [0]) (vector [1])
+    c0 = Cfg (0 :: R 1) (1 :: R 1)
 
 doublePendulum :: Double -> Double -> Double -> SysExample
-doublePendulum m1 m2 g = SE "Double pendulum" cs s f (toPhase s c0)
+doublePendulum m1 m2 g = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
   where
-    cs = fromJust . V.fromList $ ["θ1", "θ2"]
     s :: System 4 2
     s = mkSystem (vec4 m1 m1 m2 m2)
-                 (fromJust . V.fromList . (\[θ1, θ2] -> [sin θ1, -cos θ1, sin θ1 + sin θ2/2, -cos θ1 - cos θ2/2]) . V.toList)
-                 ((\[_, y1, _, y2] -> realToFrac g * (realToFrac m1 * y1 + realToFrac m2 * y2)) . V.toList)
+                 (\(V2 θ1 θ2)     -> V4 (sin θ1)            (-cos θ1)
+                                        (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
+                 )
+                 (\(V4 _ y1 _ y2) -> realToFrac g * (realToFrac m1 * y1 + realToFrac m2 * y2))
     f :: R 4 -> [Point Double]
     f = (\[x1,y1,x2,y2] -> [Pt x1 y1, Pt x2 y2]) . VS.toList . extract
     c0 :: Config 2
@@ -223,3 +227,18 @@ mkRange (wd, ht) = \case
       let xr = (uncurry (-) yb) * wd / ht / rrRatio
           x0 = (rrZero - 1) * xr
       in  ((x0, x0 + xr), yb)
+
+pattern V1 :: a -> V.Vector 1 a
+pattern V1 x <- (V.head->x)
+  where
+    V1 x = V.singleton x
+
+pattern V2 :: a -> a -> V.Vector 2 a
+pattern V2 x y <- (V.toList->[x,y])
+  where
+    V2 x y = fromJust (V.fromList [x,y])
+
+pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
+pattern V4 x y z a <- (V.toList->[x,y,z,a])
+  where
+    V4 x y z a = fromJust (V.fromList [x,y,z,a])
