@@ -24,8 +24,8 @@ You only need:
     ~~~haskell
     x1 = sin θ1
     y1 = -cos θ1
-    x2 = sin θ1 + sin θ2
-    y2 = -cos θ1 - cos θ2
+    x2 = sin θ1 + sin θ2 / 2      -- second pendulum is half-length
+    y2 = -cos θ1 - cos θ2 / 2
     ~~~
 
 2.  The masses/inertias of each of those cartesian coordinates (`m1` for `x1`
