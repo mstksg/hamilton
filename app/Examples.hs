@@ -117,8 +117,8 @@ main = do
         qVec = intercalate ", " . V.toList $ seCoords
         go hists p = do
           SO{..} <- readIORef oRef
-          let xb   = (- recip soZoom, recip soZoom)
-              p'   = stepHam (soRate / fps) seSystem p
+          let p'   = stepHam (soRate / fps) seSystem p  -- progress the simulation
+              xb   = (- recip soZoom, recip soZoom)
               info = vertCat . map (string defAttr) $
                        [ printf "[ %s ]" seName
                        , printf "<%s>: <%s>" qVec . intercalate ", "

@@ -1,13 +1,20 @@
 Hamilton
 ========
 
-Simulate physics on arbitrary coordinate systems using automatic
-differentiation and Hamiltonian mechanics.
+Simulate physics on arbitrary coordinate systems using [automatic
+differentiation][ad] and [Hamiltonian mechanics][].
 
-For example, a simulating a double pendulum system by simulating the
+[ad]: http://hackage.haskell.org/package/ad
+[Hamiltonian mechanics]: https://en.wikipedia.org/wiki/Hamiltonian_mechanics
+
+For example, a simulating a [double pendulum system][dps] by simulating the
 progression of the angles of each bob:
 
-[![My name is William Rowan Hamilton](http://i.imgur.com/Vaaa2EC.gif)](http://i.imgur.com/Vaaa2EC.gifv)
+[dps]: https://en.wikipedia.org/wiki/Double_pendulum
+
+[![My name is William Rowan Hamilton](http://i.imgur.com/Vaaa2EC.gif)][gifv]
+
+[gifv]: http://i.imgur.com/Vaaa2EC.gifv
 
 You only need:
 
@@ -36,6 +43,12 @@ through time, without needing to do any simulation involving
 stuff like that.  All you need is a description of your coordinate system
 itself, and the potential energy!
 
+[Hamiltonian mechanics]() lets you express your system parameterized by
+arbitrary coordinates and gives you equations of motions as first-order
+differential equations.  This library solves those first-order differential
+equations for you using automatic differentiation and some matrix manipulation.
 
-See [documentation](https://mstksg.github.io/hamilton/).
+See [documentation][] and [example runner][].
 
+[documentation]: https://mstksg.github.io/hamilton/
+[example runner]: https://github.com/mstksg/hamilton/blob/master/app/Examples.hs
