@@ -13,22 +13,28 @@
 {-# LANGUAGE ViewPatterns        #-}
 
 module Numeric.Hamilton
-  ( System
-  , Config(..)
-  , Phase(..)
+  ( -- * Systems and states
+    -- ** Systems
+    System
   , mkSystem
+    -- *** Utility functions for plotting
   , underlyingPos
   , underlyingPE
-  , pe
+    -- ** States
+  , Config(..)
+  , Phase(..)
   , toPhase
   , fromPhase
+    -- * State functions
   , momenta
   , velocities
   , keC
   , keP
+  , pe
   , lagrangian
   , hamiltonian
   , hamEqs
+    -- * Simulating hamiltonian dynamics
   , stepHam
   , evolveHam
   , evolveHam'
@@ -118,7 +124,8 @@ deriving instance KnownNat n => Show (Phase n)
 --
 -- For the most part, you are supposed to be able to ignore @m@.  @m@ is
 -- only provided because it's useful when plotting/drawing the system with
--- a given state back in rectangular coordinates.
+-- a given state back in rectangular coordinates. (The only functions that
+-- use the @m@ at the moment are 'underlyingPos' and 'underlyingPE')
 --
 -- A @'System' m n@'s state is described using a @'Config' n@ (which
 -- describes the system in configuration space) or a @'Phase' n@ (which
@@ -191,15 +198,10 @@ vec2l = fromJust . (\rs -> withRows rs exactDims) . toList . fmap vec2r
 --     -> V.Vector m (V.Vector n Double)
 -- l2vec = fromJust . V.fromList . map r2vec . toRows
 
--- | Create a system with @n@ generalized coordinates by providing the
--- underlying inertials, describing its coordinate space, and giving
--- pontential energy function.
---
--- Given by describing some fundamental properties of the underlying
--- cartesian coordinate space of the system (the inertia of each coordinate
--- and the potential energy function), along with a conversion function
--- from the generalized coordinate space to the underlying cartesian
--- coordinate space.
+-- | Create a system with @n@ generalized coordinates by describing its
+-- coordinate space (by a function from the generalized coordinates to the
+-- underlying cartesian coordinates), the inertia of each of those
+-- underlying coordinates, and the pontential energy function.
 mkSystem
     :: forall m n. (KnownNat m, KnownNat n)
     => R m      -- ^ The "inertia" of each of the @m@ coordinates
