@@ -10,8 +10,6 @@
 {-# LANGUAGE ViewPatterns         #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- import           Data.Fixed
--- import           Data.Foldable
 import           Control.Concurrent
 import           Control.Monad
 import           Data.Bifunctor
@@ -48,7 +46,7 @@ pendulum = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
                  (\(V1 θ)   -> V2 (sin θ) (-cos θ))
                  (\(V2 _ y) -> y                  )
     f :: R 2 -> [Point Double]
-    f = (\[x,y] -> [Pt x y]) . VS.toList . extract
+    f (r2list->[x,y]) = [Pt x y]
     c0 :: Config 1
     c0 = Cfg (0 :: R 1) (1 :: R 1)
 
@@ -62,7 +60,7 @@ doublePendulum m1 m2 g = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0
                  )
                  (\(V4 _ y1 _ y2) -> realToFrac g * (realToFrac m1 * y1 + realToFrac m2 * y2))
     f :: R 4 -> [Point Double]
-    f = (\[x1,y1,x2,y2] -> [Pt x1 y1, Pt x2 y2]) . VS.toList . extract
+    f (r2list->[x1,y1,x2,y2])= [Pt x1 y1, Pt x2 y2]
     c0 :: Config 2
     c0 = Cfg (vec2 (pi/2) 0) (vec2 0 0)
 
@@ -122,10 +120,10 @@ main = do
               info = vertCat . map (string defAttr) $
                        [ printf "[ %s ]" seName
                        , printf "<%s>: <%s>" qVec . intercalate ", "
-                          . map (printf "%.5f") . VS.toList . extract . phsPos $ p
-                       , printf "KE: %.5f" . keP seSystem $ p
-                       , printf "PE: %.5f" . pe seSystem . phsPos $ p
-                       , printf "H: %.5f" . hamiltonian seSystem $ p
+                          . map (printf "%.5f") . r2list . phsPos   $ p
+                       , printf "KE: %.5f" . keP seSystem           $ p
+                       , printf "PE: %.5f" . pe seSystem . phsPos   $ p
+                       , printf "H: %.5f" . hamiltonian seSystem    $ p
                        , " "
                        , printf "rate: x%.2f" $ soRate
                        , printf "hist: %d"    $ soHist
@@ -242,3 +240,9 @@ pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
 pattern V4 x y z a <- (V.toList->[x,y,z,a])
   where
     V4 x y z a = fromJust (V.fromList [x,y,z,a])
+
+r2list
+    :: KnownNat n
+    => R n
+    -> [Double]
+r2list = VS.toList . extract
