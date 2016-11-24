@@ -77,6 +77,9 @@ mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat 
 --   coordinates of the system's underlying cartesian coordinate system.
 --   Useful for plotting/drawing the system in cartesian space.
 underlyingPos :: System m n -> R n -> R m
+
+-- | The potential energy of a system, given the position in the
+--   generalized coordinates of the system.
 pe :: System m n -> R n -> Double
 
 -- | Convert a configuration-space representaiton of the state of the
