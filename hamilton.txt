@@ -78,6 +78,11 @@ mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat 
 --   Useful for plotting/drawing the system in cartesian space.
 underlyingPos :: System m n -> R n -> R m
 
+-- | The potential energy of a system, given the position in the underlying
+--   cartesian coordinate space of the system. Useful for plotting/drawing
+--   the system's potential energy function in cartesian space.
+underlyingPE :: System m n -> R m -> Double
+
 -- | The potential energy of a system, given the position in the
 --   generalized coordinates of the system.
 pe :: System m n -> R n -> Double
@@ -125,12 +130,18 @@ lagrangian :: (KnownNat m, KnownNat n) => System m n -> Config n -> Double
 -- | The Hamiltonian of a system (the sum of kinetic energy and the
 --   potential energy), given the system's state in phase space.
 hamiltonian :: (KnownNat m, KnownNat n) => System m n -> Phase n -> Double
+
+-- | The "hamiltonian equations" for a given system at a given state in
+--   phase space. Returns the rate of change of the positions and conjugate
+--   momenta, which can be used to progress the simulation through time.
 hamEqs :: (KnownNat m, KnownNat n) => System m n -> Phase n -> (R n, R n)
-stepHam :: (KnownNat m, KnownNat n) => Double -> System m n -> Phase n -> Phase n
+
+-- | Step a system through phase space over over a single timestep.
+stepHam :: forall m n. (KnownNat m, KnownNat n) => Double -> System m n -> Phase n -> Phase n
 
 -- | Evolve a system using a hamiltonian stepper, with the given initial
 --   phase space state.
-evolveHam :: forall m n s. (KnownNat m, KnownNat n, KnownNat s) => System m n -> Phase n -> Vector s Double -> Vector s (Phase n)
+evolveHam :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s) => System m n -> Phase n -> Vector s Double -> Vector s (Phase n)
 
 -- | Evolve a system using a hamiltonian stepper, with the given initial
 --   phase space state.
@@ -138,7 +149,7 @@ evolveHam :: forall m n s. (KnownNat m, KnownNat n, KnownNat s) => System m n ->
 --   Desired solution times provided as a list instead of a sized
 --   <a>Vector</a>. The output list should be the same length as the input
 --   list.
-evolveHam' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Phase n -> [Double] -> [Phase n]
+evolveHam' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Phase n -> NonEmpty Double -> NonEmpty (Phase n)
 
 -- | A convenience wrapper for <a>evolveHam</a> that works on configuration
 --   space states instead of phase space states.
@@ -146,7 +157,7 @@ evolveHam' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Phase n -> [
 --   Note that the simulation itself still runs in phase space; this
 --   function just abstracts over converting to and from phase space for
 --   the inputs and outputs.
-evolveHamC :: forall m n s. (KnownNat m, KnownNat n, KnownNat s) => System m n -> Config n -> Vector s Double -> Vector s (Config n)
+evolveHamC :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s) => System m n -> Config n -> Vector s Double -> Vector s (Config n)
 
 -- | A convenience wrapper for <a>evolveHam'</a> that works on
 --   configuration space states instead of phase space states.
@@ -154,7 +165,7 @@ evolveHamC :: forall m n s. (KnownNat m, KnownNat n, KnownNat s) => System m n -
 --   Note that the simulation itself still runs in phase space; this
 --   function just abstracts over converting to and from phase space for
 --   the inputs and outputs.
-evolveHamC' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Config n -> [Double] -> [Config n]
+evolveHamC' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Config n -> NonEmpty Double -> NonEmpty (Config n)
 instance GHC.Generics.Generic (Numeric.Hamilton.Phase a)
 instance GHC.Generics.Generic (Numeric.Hamilton.Config a)
 instance GHC.TypeLits.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Config n)
