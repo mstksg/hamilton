@@ -370,7 +370,8 @@ evolveHam
 evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
                   $ odeSolveV RKf45 hi eps eps (const f) (fromPs p0) ts'
   where
-    hi  = (V.unsafeIndex ts 1 - V.unsafeIndex ts 0) / 100
+    hi  | V.length ts == 1 = V.unsafeIndex ts 0 / 100
+        | otherwise        = (V.unsafeIndex ts 1 - V.unsafeIndex ts 0) / 100
     eps = 1.49012e-08
     f :: LA.Vector Double -> LA.Vector Double
     f   = uncurry (\p m -> LA.vjoin [p,m])

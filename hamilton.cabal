@@ -29,7 +29,7 @@ library
 executable hamilton-examples
   hs-source-dirs:      app
   main-is:             Examples.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
                      , hamilton
                      , vty
