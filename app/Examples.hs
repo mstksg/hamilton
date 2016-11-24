@@ -43,6 +43,19 @@ pendulum = SE s f (toPhase s c0)
     c0 :: Config 1
     c0 = Cfg (vector [0]) (vector [1])
 
+doublePendulum :: Double -> Double -> SysExample
+doublePendulum m1 m2 = SE s f (toPhase s c0)
+  where
+    s :: System 4 2
+    s = mkSystem (vec4 m1 m1 m2 m2)
+                 (fromJust . V.fromList . (\[θ1, θ2] -> [sin θ1, -cos θ1, sin θ1 + sin θ2, -cos θ1 - cos θ2]) . V.toList)
+                 ((\[_, y1, _, y2] -> realToFrac m1 * y1 + realToFrac m2 * y2) . V.toList)
+    f :: R 4 -> [Point Double]
+    f = (\[x1,y1,x2,y2] -> [Pt x1 y1, Pt x2 y2]) . VS.toList . extract
+    c0 :: Config 2
+    c0 = Cfg (vec2 (pi/2) 0) (vec2 0 0)
+
+
 data SimOpts = SO { soZoom :: Double
                   , soRate :: Double
                   , soHist :: Int
@@ -59,9 +72,10 @@ main = do
     cfg <- standardIOConfig
     vty <- mkVty cfg
 
-    opts <- newIORef $ SO 0.5 1 15
+    opts <- newIORef $ SO 0.5 1 25
 
-    t <- forkIO $ loop vty opts pendulum
+    -- t <- forkIO $ loop vty opts pendulum
+    t <- forkIO $ loop vty opts (doublePendulum 3 1)
 
     forever $ do
       e <- nextEvent vty
