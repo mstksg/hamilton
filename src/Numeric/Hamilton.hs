@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeInType          #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -23,19 +24,29 @@ module Numeric.Hamilton
   , lagrangian
   , hamiltonian
   , hamEqs
+  , stepHam
+  , evolveHam
+  , evolveHam'
+  , evolveHamC
+  , evolveHamC'
   ) where
 
+import           Control.Monad
+import           Data.Bifunctor
 import           Data.Foldable
 import           Data.Kind
 import           Data.Maybe
+import           Data.Proxy
 import           GHC.Generics                 (Generic)
 import           GHC.TypeLits
 import           Numeric.AD
+import           Numeric.GSL.ODE
 import           Numeric.LinearAlgebra.Static
 import qualified Control.Comonad              as C
 import qualified Control.Comonad.Cofree       as C
 import qualified Data.Vector.Generic.Sized    as VG
 import qualified Data.Vector.Sized            as V
+import qualified Numeric.LinearAlgebra        as LA
 
 -- | Represents the full state of a system of @n@ generalized coordinates
 -- in configuration space (informally, "positions and velocities")
@@ -92,8 +103,6 @@ data Phase :: Nat -> Type where
 
 deriving instance KnownNat n => Show (Phase n)
 
--- TODO: cache inverses, JMJs?
-
 -- | Represents a physical system in which physics happens.  A @'System'
 -- m n@ is a system whose state described using @n@ generalized coordinates
 -- (an "@n@-dimensional" system), where the underlying cartesian coordinate
@@ -129,6 +138,12 @@ vec2l
     => V.Vector m (V.Vector n Double)
     -> L m n
 vec2l = fromJust . (\rs -> withRows rs exactDims) . toList . fmap vec2r
+
+-- l2vec
+--     :: (KnownNat m, KnownNat n)
+--     => L m n
+--     -> V.Vector m (V.Vector n Double)
+-- l2vec = fromJust . V.fromList . map r2vec . toRows
 
 -- | Create a system with @n@ generalized coordinates by providing the
 -- underlying inertials, describing its coordinate space, and giving
@@ -286,6 +301,16 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     dHdp = ijmj #> phsMom
     dHdq = dTdq + trj #> sysPotentialGrad (sysCoords phsPos)
 
+stepHam
+    :: (KnownNat m, KnownNat n)
+    => Double
+    -> System m n
+    -> Phase n
+    -> Phase n
+stepHam r s p@Phs{..} = Phs (phsPos + konst r * dq) (phsMom + konst r * dp)
+  where
+    (dq, dp) = hamEqs s p
+
 tr2
     :: (KnownNat m, KnownNat n, KnownNat o)
     => V.Vector m (L n o)
@@ -293,3 +318,69 @@ tr2
 tr2 = fmap (fromJust . (\rs -> withRows rs exactDims) . toList)
     . sequenceA
     . fmap (fromJust . V.fromList . toRows)
+
+-- | Evolve a system using a hamiltonian stepper, with the given initial
+-- phase space state.
+--
+-- Desired solution times provided as a list instead of a sized 'V.Vector'.
+-- The output list should be the same length as the input list.
+evolveHam'
+    :: forall m n. (KnownNat m, KnownNat n)
+    => System m n
+    -> Phase n
+    -> [Double]
+    -> [Phase n]
+evolveHam' s p0 ts = V.withSizedList ts (toList . evolveHam s p0)
+
+-- | Evolve a system using a hamiltonian stepper, with the given initial
+-- phase space state.
+evolveHam
+    :: forall m n s. (KnownNat m, KnownNat n, KnownNat s)
+    => System m n           -- ^ system to simulate
+    -> Phase n              -- ^ initial state, in phase space
+    -> V.Vector s Double    -- ^ desired solution times
+    -> V.Vector s (Phase n)
+evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
+                  $ odeSolveV RKf45 hi eps eps (const f) (fromPs p0) ts'
+  where
+    hi  = (V.unsafeIndex ts 1 - V.unsafeIndex ts 0) / 100
+    eps = 1.49012e-08
+    f :: LA.Vector Double -> LA.Vector Double
+    f   = uncurry (\p m -> LA.vjoin [p,m])
+        . join bimap extract . hamEqs s . toPs
+    ts' = VG.fromSized . VG.convert $ ts
+    n = fromInteger $ natVal (Proxy @n)
+    fromPs :: Phase n -> LA.Vector Double
+    fromPs p = LA.vjoin . map extract $ [phsPos p, phsMom p]
+    toPs :: LA.Vector Double -> Phase n
+    toPs v = Phs pP pM
+      where
+        Just [pP, pM] = traverse create . LA.takesV [n, n] $ v
+
+-- | A convenience wrapper for 'evolveHam'' that works on configuration
+-- space states instead of phase space states.
+--
+-- Note that the simulation itself still runs in phase space; this function
+-- just abstracts over converting to and from phase space for the inputs
+-- and outputs.
+evolveHamC'
+    :: forall m n. (KnownNat m, KnownNat n)
+    => System m n           -- ^ system to simulate
+    -> Config n             -- ^ initial state, in configuration space
+    -> [Double]             -- ^ desired solution times
+    -> [Config n]
+evolveHamC' s c0 = fmap (fromPhase s) . evolveHam' s (toPhase s c0)
+
+-- | A convenience wrapper for 'evolveHam' that works on configuration
+-- space states instead of phase space states.
+--
+-- Note that the simulation itself still runs in phase space; this function
+-- just abstracts over converting to and from phase space for the inputs
+-- and outputs.
+evolveHamC
+    :: forall m n s. (KnownNat m, KnownNat n, KnownNat s)
+    => System m n           -- ^ system to simulate
+    -> Config n             -- ^ initial state, in configuration space
+    -> V.Vector s Double    -- ^ desired solution times
+    -> V.Vector s (Config n)
+evolveHamC s c0 = fmap (fromPhase s) . evolveHam s (toPhase s c0)

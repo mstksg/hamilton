@@ -37,11 +37,17 @@ resolver: lts-7.10
 # will not be run. This is useful for tweaking upstream packages.
 packages:
 - '.'
+- location:
+    git: https://github.com/mstksg/vector-sized
+    commit: f25977e5c3df91cc6349a55e01bad26960481eba
+  extra-dep: true
+
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- vector-sized-0.4.0.1
+# - vector-sized-0.4.0.1
 - hmatrix-0.18.0.0
+- hmatrix-gsl-0.18.0.1
 
 # Override default flag values for local packages and extra-deps
 flags: {}
