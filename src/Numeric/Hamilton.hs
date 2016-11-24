@@ -15,6 +15,9 @@ module Numeric.Hamilton
   , Config(..)
   , Phase(..)
   , mkSystem
+  , underlyingPos
+  , underlyingInertia
+  , pe
   , toPhase
   , fromPhase
   , momenta
@@ -116,14 +119,30 @@ deriving instance KnownNat n => Show (Phase n)
 -- describes the system in configuration space) or a @'Phase' n@ (which
 -- describes the system in phase space).
 data System :: Nat -> Nat -> Type where
-    Sys :: { sysMass          :: R m
-           , sysCoords        :: R n -> R m
-           , sysJacobian      :: R n -> L m n
-           , sysJacobian2     :: R n -> V.Vector m (Sym n)
-           , sysPotential     :: R m -> Double
-           , sysPotentialGrad :: R m -> R m
+    Sys :: { _sysInertia       :: R m
+           , _sysCoords        :: R n -> R m
+           , _sysJacobian      :: R n -> L m n
+           , _sysJacobian2     :: R n -> V.Vector m (Sym n)
+           , _sysPotential     :: R m -> Double
+           , _sysPotentialGrad :: R m -> R m
            }
         -> System m n
+
+underlyingPos
+    :: System m n
+    -> R n
+    -> R m
+underlyingPos = _sysCoords
+
+underlyingInertia
+    :: System m n
+    -> R m
+underlyingInertia = _sysInertia
+
+pe  :: System m n
+    -> R n
+    -> Double
+pe s = _sysPotential s . underlyingPos s
 
 vec2r
     :: KnownNat n => V.Vector n Double -> R n
@@ -191,9 +210,9 @@ momenta
     => System m n
     -> Config n
     -> R n
-momenta Sys{..} Cfg{..} = tr j #> diag sysMass #> j #> cfgVel
+momenta Sys{..} Cfg{..} = tr j #> diag _sysInertia #> j #> cfgVel
   where
-    j = sysJacobian cfgPos
+    j = _sysJacobian cfgPos
 
 -- | Convert a configuration-space representaiton of the state of the
 -- system to a phase-space representation.
@@ -231,7 +250,7 @@ lagrangian
     -> Double
 lagrangian s = do
     t <- keC s
-    u <- sysPotential s . sysCoords s . cfgPos
+    u <- pe s . cfgPos
     return (t - u)
 
 -- | Compute the rate of change of each generalized coordinate by giving
@@ -243,8 +262,8 @@ velocities
     -> R n
 velocities Sys{..} Phs{..} = inv jmj #> phsMom
   where
-    j   = sysJacobian phsPos
-    jmj = tr j <> diag sysMass <> j
+    j   = _sysJacobian phsPos
+    jmj = tr j <> diag _sysInertia <> j
 
 -- | Invert 'toPhase' and convert a description of a system's state in
 -- phase space to a description of the system's state in configuration
@@ -279,7 +298,7 @@ hamiltonian
     -> Double
 hamiltonian s = do
     t <- keP s
-    u <- sysPotential s . sysCoords s . phsPos
+    u <- pe s . phsPos
     return (t + u)
 
 hamEqs
@@ -289,17 +308,17 @@ hamEqs
     -> (R n, R n)
 hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
   where
-    mm   = diag sysMass
-    j    = sysJacobian phsPos
+    mm   = diag _sysInertia
+    j    = _sysJacobian phsPos
     trj  = tr j
-    j'   = unSym <$> sysJacobian2 phsPos
+    j'   = unSym <$> _sysJacobian2 phsPos
     jmj  = trj <> mm <> j
     ijmj = inv jmj
     dTdq = vec2r
          . flip fmap (tr2 j') $ \djdq ->
              (phsMom <.> tr ijmj #> tr djdq #> mm #> djdq #> ijmj #> phsMom) / 2
     dHdp = ijmj #> phsMom
-    dHdq = dTdq + trj #> sysPotentialGrad (sysCoords phsPos)
+    dHdq = dTdq + trj #> _sysPotentialGrad (_sysCoords phsPos)
 
 stepHam
     :: (KnownNat m, KnownNat n)
