@@ -17,9 +17,10 @@ import           Data.IORef
 import           Data.List
 import           Data.Maybe
 import           GHC.TypeLits
-import           Graphics.Vty hiding                 (Config)
+import           Graphics.Vty hiding                 (Config, (<|>))
 import           Numeric.Hamilton
-import           Numeric.LinearAlgebra.Static hiding (dim)
+import           Numeric.LinearAlgebra.Static hiding (dim, (<>))
+import           Options.Applicative
 import           System.Exit
 import           Text.Printf
 import qualified Data.Map.Strict                     as M
@@ -38,8 +39,8 @@ data SysExample where
           }
        -> SysExample
 
-pendulum :: SysExample
-pendulum = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
+pendulum :: Double -> SysExample
+pendulum v0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
   where
     s :: System 2 1
     s = mkSystem (vec2 1 1                        )
@@ -48,7 +49,7 @@ pendulum = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
     f :: R 2 -> [Point Double]
     f = (:[]) . r2pt
     c0 :: Config 1
-    c0 = Cfg (0 :: R 1) (1 :: R 1)
+    c0 = Cfg (0 :: R 1) (konst v0 :: R 1)
 
 doublePendulum :: Double -> Double -> SysExample
 doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
@@ -82,6 +83,53 @@ room = SE "Room" (V2 "x" "y") s f (toPhase s c0)
     c0 :: Config 2
     c0 = Cfg (vec2 (-0.5) 0.5) (vec2 1 0)
 
+data ExampleOpts = EO { eoChoice :: SysExampleChoice }
+
+data SysExampleChoice =
+        SECDoublePend Double Double
+      | SECPend Double
+      | SECRoom
+
+parseEO :: Parser ExampleOpts
+parseEO = EO <$> (parseSEC <|> pure (SECDoublePend 1 1))
+
+parseSEC :: Parser SysExampleChoice
+parseSEC = subparser . mconcat $
+    [ command "doublepend" $
+        info (helper <*> parseDoublePend)
+             (progDesc "Double pendulum (default)")
+    , command "pend"       $
+        info (helper <*> parsePend      )
+             (progDesc "Single pendulum")
+    , command "room"       $
+        info (helper <*> parseRoom      )
+        (progDesc "Ball in room, bouncing off of walls")
+    , metavar "EXAMPLE"
+    ]
+  where
+    parsePend
+      = SECPend       <$> option auto ( long "vel"
+                                     <> short 'v'
+                                     <> metavar "VELOCITY"
+                                     <> help "Initial rightward velocity of bob"
+                                     <> value 1
+                                     <> showDefault
+                                      )
+    parseDoublePend
+      = SECDoublePend <$> option auto ( long "m1"
+                                     <> metavar "MASS"
+                                     <> help "Mass of first bob"
+                                     <> value 1
+                                     <> showDefault
+                                      )
+                      <*> option auto ( long "m2"
+                                     <> metavar "MASS"
+                                     <> help "Mass of second bob"
+                                     <> value 1
+                                     <> showDefault
+                                      )
+    parseRoom
+      = pure SECRoom
 
 data SimOpts = SO { soZoom :: Double
                   , soRate :: Double
@@ -96,14 +144,23 @@ data SimEvt = SEQuit
 
 main :: IO ()
 main = do
-    cfg <- standardIOConfig
-    vty <- mkVty cfg
+    EO{..} <- execParser $ info (helper <*> parseEO)
+        ( fullDesc
+       <> header "hamilton-examples - hamilton library example suite"
+       <> progDesc ( "Run examples from the hamilton library example suite."
+                  <> "Use with [example] --help for more per-example options."
+                   )
+        )
+
+    vty <- mkVty =<< standardIOConfig
 
     opts <- newIORef $ SO 0.5 1 25
 
-    -- t <- forkIO $ loop vty opts pendulum
-    -- t <- forkIO $ loop vty opts (doublePendulum 1 1)
-    t <- forkIO $ loop vty opts room
+    t <- forkIO . loop vty opts $ case eoChoice of
+      SECDoublePend m1 m2 -> doublePendulum m1 m2
+      SECPend       v0    -> pendulum v0
+      SECRoom             -> room
+
 
     forever $ do
       e <- nextEvent vty
@@ -136,22 +193,22 @@ main = do
           SO{..} <- readIORef oRef
           let p'   = stepHam (soRate / fps) seSystem p  -- progress the simulation
               xb   = (- recip soZoom, recip soZoom)
-              info = vertCat . map (string defAttr) $
-                       [ printf "[ %s ]" seName
-                       , printf "<%s>: <%s>" qVec . intercalate ", "
-                          . map (printf "%.5f") . r2list . phsPos   $ p
-                       , printf "KE: %.5f" . keP seSystem           $ p
-                       , printf "PE: %.5f" . pe seSystem . phsPos   $ p
-                       , printf "H: %.5f" . hamiltonian seSystem    $ p
-                       , " "
-                       , printf "rate: x%.2f" $ soRate
-                       , printf "hist: %d"    $ soHist
-                       ]
+              infobox = vertCat . map (string defAttr) $
+                          [ printf "[ %s ]" seName
+                          , printf "<%s>: <%s>" qVec . intercalate ", "
+                             . map (printf "%.5f") . r2list . phsPos   $ p
+                          , printf "KE: %.5f" . keP seSystem           $ p
+                          , printf "PE: %.5f" . pe seSystem . phsPos   $ p
+                          , printf "H: %.5f" . hamiltonian seSystem    $ p
+                          , " "
+                          , printf "rate: x%.2f" $ soRate
+                          , printf "hist: %d"    $ soHist
+                          ]
               pts  = (`zip` ptAttrs) . seDraw . underlyingPos seSystem . phsPos
                    $ p
               hists' = foldl' (\h (r, a) -> M.insertWith (addHist soHist) a [r] h) hists pts
           dr <- displayBounds $ outputIface vty
-          update vty . picForLayers . (info:) . plot dr (PX xb (RR 0.5 screenRatio)) $
+          update vty . picForLayers . (infobox:) . plot dr (PX xb (RR 0.5 screenRatio)) $
                ((second . second) (defAttr `withForeColor`) <$> pts)
             ++ (map (\((_,c),r) -> (r, ('.', defAttr `withForeColor` c)))
                   . concatMap sequence
@@ -270,6 +327,7 @@ r2pt
     :: R 2
     -> Point Double
 r2pt (r2list->[x,y]) = Pt x y
+r2pt _               = error "r2pt: inaccessible"
 
 logistic
     :: Floating a => a -> a -> a -> a -> a

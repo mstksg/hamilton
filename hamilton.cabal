@@ -35,6 +35,7 @@ executable hamilton-examples
                      , containers
                      , hamilton
                      , hmatrix
+                     , optparse-applicative
                      , vector
                      , vector-sized
                      , vty
