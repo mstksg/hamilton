@@ -46,23 +46,41 @@ pendulum = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
                  (\(V1 θ)   -> V2 (sin θ) (-cos θ))
                  (\(V2 _ y) -> y                  )
     f :: R 2 -> [Point Double]
-    f (r2list->[x,y]) = [Pt x y]
+    f = (:[]) . r2pt
     c0 :: Config 1
     c0 = Cfg (0 :: R 1) (1 :: R 1)
 
-doublePendulum :: Double -> Double -> Double -> SysExample
-doublePendulum m1 m2 g = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
+doublePendulum :: Double -> Double -> SysExample
+doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
   where
     s :: System 4 2
     s = mkSystem (vec4 m1 m1 m2 m2)
                  (\(V2 θ1 θ2)     -> V4 (sin θ1)            (-cos θ1)
                                         (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
                  )
-                 (\(V4 _ y1 _ y2) -> realToFrac g * (realToFrac m1 * y1 + realToFrac m2 * y2))
+                 (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
     f :: R 4 -> [Point Double]
-    f (r2list->[x1,y1,x2,y2])= [Pt x1 y1, Pt x2 y2]
+    f = (\(p1,p2) -> [p1,p2]) . bimap r2pt r2pt . split
     c0 :: Config 2
     c0 = Cfg (vec2 (pi/2) 0) (vec2 0 0)
+
+room :: SysExample
+room = SE "Room" (V2 "x" "y") s f (toPhase s c0)
+  where
+    s :: System 2 2
+    s = mkSystem (vec2 1 1)
+                 id
+                 (\(V2 x y) -> sum [ 2 * y                      -- gravity
+                                   , 1 - logistic (-1) 5 0.1 y  -- bottom wall
+                                   , logistic 1 5 0.1 y         -- top wall
+                                   , 1 - logistic (-2) 5 0.1 x  -- left wall
+                                   , logistic 2 5 0.1 x         -- right wall
+                                   ]
+                 )
+    f :: R 2 -> [Point Double]
+    f = (:[]) . r2pt
+    c0 :: Config 2
+    c0 = Cfg (vec2 (-0.5) 0.5) (vec2 1 0)
 
 
 data SimOpts = SO { soZoom :: Double
@@ -84,7 +102,8 @@ main = do
     opts <- newIORef $ SO 0.5 1 25
 
     -- t <- forkIO $ loop vty opts pendulum
-    t <- forkIO $ loop vty opts (doublePendulum 1 1 5)
+    -- t <- forkIO $ loop vty opts (doublePendulum 1 1)
+    t <- forkIO $ loop vty opts room
 
     forever $ do
       e <- nextEvent vty
@@ -246,3 +265,15 @@ r2list
     => R n
     -> [Double]
 r2list = VS.toList . extract
+
+r2pt
+    :: R 2
+    -> Point Double
+r2pt (r2list->[x,y]) = Pt x y
+
+logistic
+    :: Floating a => a -> a -> a -> a -> a
+logistic pos ht width = \x -> ht / (1 + exp (- beta * (x - pos)))
+  where
+    beta = log (0.9 / (1 - 0.9)) / width
+
