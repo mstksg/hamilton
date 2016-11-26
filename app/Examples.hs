@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE ViewPatterns         #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -16,6 +17,7 @@ import           Data.Bifunctor
 import           Data.IORef
 import           Data.List
 import           Data.Maybe
+import           Data.Monoid
 import           GHC.TypeLits
 import           Graphics.Vty hiding                 (Config, (<|>))
 import           Numeric.Hamilton
@@ -23,7 +25,9 @@ import           Numeric.LinearAlgebra.Static hiding (dim, (<>))
 import           Options.Applicative
 import           System.Exit
 import           Text.Printf
+import           Text.Read
 import qualified Data.Map.Strict                     as M
+import qualified Data.Vector.Generic.Sized           as VG
 import qualified Data.Vector.Sized                   as V
 import qualified Data.Vector.Storable                as VS
 
@@ -34,7 +38,7 @@ data SysExample where
        => { seName   :: String
           , seCoords :: V.Vector n String
           , seSystem :: System m n
-          , seDraw   :: R m -> [Point Double]
+          , seDraw   :: R m -> [V2 Double]
           , seInit   :: Phase n
           }
        -> SysExample
@@ -46,8 +50,8 @@ pendulum v0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
     s = mkSystem (vec2 1 1                        )     -- masses
                  (\(V1 θ)   -> V2 (sin θ) (-cos θ))     -- coordinates
                  (\(V2 _ y) -> y                  )     -- potential
-    f :: R 2 -> [Point Double]
-    f xs = [r2pt xs]
+    f :: R 2 -> [V2 Double]
+    f xs = [r2vec xs]
     c0 :: Config 1
     c0 = Cfg (0 :: R 1) (konst v0 :: R 1)
 
@@ -61,8 +65,8 @@ doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
                  )                      -- coordinates
                  (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
                                         -- potential
-    f :: R 4 -> [Point Double]
-    f (split->(xs,ys))= [r2pt xs, r2pt ys]
+    f :: R 4 -> [V2 Double]
+    f (split->(xs,ys))= [r2vec xs, r2vec ys]
     c0 :: Config 2
     c0 = Cfg (vec2 (pi/2) 0) (vec2 0 0)
 
@@ -79,10 +83,38 @@ room = SE "Room" (V2 "x" "y") s f (toPhase s c0)
                                    , logistic 2 5 0.1 x         -- right wall
                                    ]
                  )                  -- potential
-    f :: R 2 -> [Point Double]
-    f xs = [r2pt xs]
+    f :: R 2 -> [V2 Double]
+    f xs = [r2vec xs]
     c0 :: Config 2
     c0 = Cfg (vec2 (-0.5) 0.5) (vec2 1 0)
+
+bezier
+    :: V4 (V2 Double)
+    -> SysExample
+bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
+  where
+    s :: System 2 1
+    s = mkSystem (vec2 1 1)             -- masses
+                 (\(V1 t) -> foldl' (liftA2 (+)) (pure 0)
+                      $ V.zipWith4 (\a b c p -> (* (a * b * c)) . realToFrac <$> p)
+                          (V4 1          3          3      1     )
+                          (V4 ((1-t)**3) ((1-t)**2) (1-t)  1     )
+                          (V4 1          t          (t**2) (t**3))
+                          ps
+                 )    -- coordinates
+                 (\(V2 x y) -> sum [ 1 - logistic (realToFrac minY) 10 0.1 y  -- bottom wall
+                                   , logistic (realToFrac maxY) 10 0.1 y      -- top wall
+                                   , 1 - logistic (realToFrac minX) 10 0.1 x  -- left wall
+                                   , logistic (realToFrac maxX) 10 0.1 x      -- right wall
+                                   ]
+                 )    -- potential (box)
+    f :: R 2 -> [V2 Double]
+    f xs = [r2vec xs]
+    c0 :: Config 1
+    c0 = Cfg (0.1 :: R 1) (0.25 :: R 1)
+    V2 minX minY = V.foldl1' (liftA2 min) ps
+    V2 maxX maxY = V.foldl1' (liftA2 max) ps
+
 
 data ExampleOpts = EO { eoChoice :: SysExampleChoice }
 
@@ -90,6 +122,7 @@ data SysExampleChoice =
         SECDoublePend Double Double
       | SECPend Double
       | SECRoom
+      | SECBezier (V4 (V2 Double))
 
 parseEO :: Parser ExampleOpts
 parseEO = EO <$> (parseSEC <|> pure (SECDoublePend 1 1))
@@ -105,6 +138,9 @@ parseSEC = subparser . mconcat $
     , command "room"       $
         info (helper <*> parseRoom      )
         (progDesc "Ball in room, bouncing off of walls")
+    , command "bezier"     $
+        info (helper <*> parseBezier    )
+        (progDesc "Particle moving along a parameterized bezier curve")
     , metavar "EXAMPLE"
     ]
   where
@@ -131,6 +167,15 @@ parseSEC = subparser . mconcat $
                                       )
     parseRoom
       = pure SECRoom
+    parseBezier
+      = SECBezier <$> option f ( long "points"
+                              <> short 'p'
+                              <> metavar "POINTS"
+                              <> help "List of four control points, as tuples"
+                              <> value (V4 (V2 (-1) (-1)) (V2 (-2) 1) (V2 1 1) (V2 2 (-1)))
+                              <> showDefaultWith (show . map (\(V2 x y) -> (x, y)) . V.toList)
+                               )
+      where f = maybeReader $ V.fromList . map (\(x, y) -> V2 x y) <=< readMaybe
 
 data SimOpts = SO { soZoom :: Double
                   , soRate :: Double
@@ -161,6 +206,7 @@ main = do
       SECDoublePend m1 m2 -> doublePendulum m1 m2
       SECPend       v0    -> pendulum v0
       SECRoom             -> room
+      SECBezier     ps    -> bezier ps
 
 
     forever $ do
@@ -236,9 +282,6 @@ processEvt = \case
     EvKey (KChar '{') []      -> Just $ SEHist (-5)
     _                         -> Nothing
 
-data Point a = Pt { pX :: a, pY :: a }
-             deriving (Show, Functor)
-
 data RangeRatio = RR { -- | Where on the screen (0 to 1) to place the other axis
                        rrZero  :: Double
                        -- | Ratio of height of a terminal character to width
@@ -253,7 +296,7 @@ data PlotRange = PXY (Double, Double) (Double, Double)
 plot
     :: (Int, Int)               -- ^ display bounds
     -> PlotRange
-    -> [(Point Double, (Char, Attr))]   -- ^ points to plot
+    -> [(V2 Double, (Char, Attr))]   -- ^ points to plot
     -> [Image]
 plot (wd,ht) pr = map (crop wd ht)
                 . (++ bgs)
@@ -262,25 +305,25 @@ plot (wd,ht) pr = map (crop wd ht)
     wd' = fromIntegral wd
     ht' = fromIntegral ht
     ((xmin, xmax), (ymin, ymax)) = mkRange (wd', ht') pr
-    origin = place EQ EQ (Pt 0 0) $ char defAttr '+'
-    xaxis  = place EQ EQ (Pt 0 0) $ charFill defAttr '-' wd 1
-    yaxis  = place EQ EQ (Pt 0 0) $ charFill defAttr '|' 1 ht
+    origin = place EQ EQ (V2 0 0) $ char defAttr '+'
+    xaxis  = place EQ EQ (V2 0 0) $ charFill defAttr '-' wd 1
+    yaxis  = place EQ EQ (V2 0 0) $ charFill defAttr '|' 1 ht
     xrange = xmax - xmin
     yrange = ymax - ymin
     bg     = backgroundFill wd ht
-    scale Pt{..} = Pt x y
+    scale (V2 pX pY) = V2 x y
       where
         x = round $ (pX - xmin) * (wd' / xrange)
         y = round $ (pY - ymin) * (ht' / yrange)
-    place aX aY (scale->Pt{..}) i
+    place aX aY (scale->(V2 pX pY)) i
         = translate (fAlign aX (imageWidth  i))
                     (fAlign aY (imageHeight i))
         . translate pX pY
         $ i
-    labels = [ place LT EQ (Pt xmin 0) . string defAttr $ printf "%.2f" xmin
-             , place GT EQ (Pt xmax 0) . string defAttr $ printf "%.2f" xmax
-             , place EQ LT (Pt 0 ymin) . string defAttr $ printf "%.2f" ymin
-             , place EQ GT (Pt 0 ymax) . string defAttr $ printf "%.2f" ymax
+    labels = [ place LT EQ (V2 xmin 0) . string defAttr $ printf "%.2f" xmin
+             , place GT EQ (V2 xmax 0) . string defAttr $ printf "%.2f" xmax
+             , place EQ LT (V2 0 ymin) . string defAttr $ printf "%.2f" ymin
+             , place EQ GT (V2 0 ymax) . string defAttr $ printf "%.2f" ymax
              ]
     bgs    = labels ++ [origin, xaxis, yaxis, bg]
     fAlign = \case
@@ -308,11 +351,13 @@ pattern V1 x <- (V.head->x)
   where
     V1 x = V.singleton x
 
-pattern V2 :: a -> a -> V.Vector 2 a
+type V2 = V.Vector 2
+pattern V2 :: a -> a -> V2 a
 pattern V2 x y <- (V.toList->[x,y])
   where
     V2 x y = fromJust (V.fromList [x,y])
 
+type V4 = V.Vector 4
 pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
 pattern V4 x y z a <- (V.toList->[x,y,z,a])
   where
@@ -324,11 +369,11 @@ r2list
     -> [Double]
 r2list = VS.toList . extract
 
-r2pt
-    :: R 2
-    -> Point Double
-r2pt (r2list->[x,y]) = Pt x y
-r2pt _               = error "r2pt: inaccessible"
+r2vec
+    :: KnownNat n
+    => R n
+    -> V.Vector n Double
+r2vec = VG.convert . fromJust . VG.toSized . extract
 
 logistic
     :: Floating a => a -> a -> a -> a -> a
