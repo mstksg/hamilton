@@ -77,23 +77,23 @@ doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
     c0 :: Config 2
     c0 = Cfg (vec2 (pi/2) 0) (vec2 0 0)
 
-room :: SysExample
-room = SE "Room" (V2 "x" "y") s f (toPhase s c0)
+room :: Double -> SysExample
+room θ = SE "Room" (V2 "x" "y") s f (toPhase s c0)
   where
     s :: System 2 2
     s = mkSystem (vec2 1 1)         -- masses
                  id                 -- coordinates
                  (\(V2 x y) -> sum [ 2 * y                      -- gravity
-                                   , 1 - logistic (-1) 5 0.1 y  -- bottom wall
-                                   , logistic 1 5 0.1 y         -- top wall
-                                   , 1 - logistic (-2) 5 0.1 x  -- left wall
-                                   , logistic 2 5 0.1 x         -- right wall
+                                   , 1 - logistic (-1) 10 0.1 y  -- bottom wall
+                                   ,     logistic 1 10 0.1 y     -- top wall
+                                   , 1 - logistic (-2) 10 0.1 x  -- left wall
+                                   ,     logistic 2 10 0.1 x     -- right wall
                                    ]
                  )                  -- potential
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 2
-    c0 = Cfg (vec2 (-0.5) 0.5) (vec2 1 0)
+    c0 = Cfg (vec2 (-1) 0.25) (vec2 (cos θ) (sin θ))
 
 twoBody :: Double -> Double -> Double -> SysExample
 twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
@@ -144,7 +144,7 @@ data ExampleOpts = EO { eoChoice :: SysExampleChoice }
 data SysExampleChoice =
         SECDoublePend Double Double
       | SECPend Double Double
-      | SECRoom
+      | SECRoom Double
       | SECBezier (NE.NonEmpty (V2 Double))
       | SECTwoBody Double Double Double
 
@@ -175,7 +175,7 @@ parseSEC = subparser . mconcat $
       = SECPend       <$> option auto ( long "angle"
                                      <> short 'a'
                                      <> metavar "ANGLE"
-                                     <> help "Intitial angle (in degrees) of bob, from vertical"
+                                     <> help "Intitial rightward angle (in degrees) of bob"
                                      <> value 0
                                      <> showDefault
                                       )
@@ -200,7 +200,13 @@ parseSEC = subparser . mconcat $
                                      <> showDefault
                                       )
     parseRoom
-      = pure SECRoom
+      = SECRoom    <$> option auto ( long "angle"
+                                  <> short 'a'
+                                  <> metavar "ANGLE"
+                                  <> help "Initial upward launch angle (in degrees) of object"
+                                  <> value 45
+                                  <> showDefault
+                                   )
     parseTwoBody
       = SECTwoBody <$> option auto ( long "m1"
                                   <> metavar "MASS"
@@ -251,8 +257,9 @@ main = do
     EO{..} <- execParser $ info (helper <*> parseEO)
         ( fullDesc
        <> header "hamilton-examples - hamilton library example suite"
-       <> progDesc ( "Run examples from the hamilton library example suite."
-                  <> "Use with [example] --help for more per-example options."
+       <> progDesc ( "Run examples from the hamilton library example suite.  "
+                  <> "Use with [EXAMPLE] --help for more per-example options.  "
+                  <> "To adjust rate/history/zoom, use keys <>/[]/-+, respectively."
                    )
         )
 
@@ -263,7 +270,7 @@ main = do
     t <- forkIO . loop vty opts $ case eoChoice of
       SECDoublePend m1 m2        -> doublePendulum m1 m2
       SECPend       d0 ω0        -> pendulum (d0 / 180 * pi) ω0
-      SECRoom                    -> room
+      SECRoom       d0           -> room (d0 / 180 * pi)
       SECTwoBody    m1 m2 ω0     -> twoBody m1 m2 ω0
       SECBezier     (p NE.:| ps) -> V.withSized (VV.fromList ps)
                                       (bezier . V.cons p)
