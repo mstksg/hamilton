@@ -102,7 +102,8 @@ twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
     mT = m1 + m2
     s :: System 4 2
     s = mkSystem (vec4 m1 m1 m2 m2) -- masses
-                 -- r1 and r2 are calculated from the center of mass
+                 -- r is the jacobi coordinate, and this is how you
+                 -- calculuate r1 and r2 from jacobi coordinates
                  (\(V2 r θ) -> let r1 = r * realToFrac (-m2 / mT)
                                    r2 = r * realToFrac (m1 / mT)
                                in  V4 (r1 * cos θ) (r1 * sin θ)

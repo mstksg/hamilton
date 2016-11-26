@@ -43,6 +43,17 @@ and `θ2`) through time, without needing to do any simulation involving
 stuff like that.  All you need is a description of your coordinate system
 itself, and the potential energy!
 
+~~~haskell
+doublePendulum :: System 4 2
+doublePendulum =
+    mkSystem' (vec4 m1 m1 m2 m2)            -- masses
+              (\(V2 θ1 θ2)     -> V4 (sin θ1)            (-cos θ1)
+                                     (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
+              )                             -- coordinates
+              (\(V4 _ y1 _ y2) -> (m1 * y1 + m2 * y2) * g)
+                                            -- potential
+~~~
+
 Thanks to [~~Alexander~~ William Rowan Hamilton][WRH], we can express our
 system parameterized by arbitrary coordinates and get back equations of motions
 as first-order differential equations.  This library solves those first-order
@@ -93,6 +104,8 @@ Call with `--help` (or `[EXAMPLE] --help`) for more information.
 More examples
 -------------
 
+### Two-body system under gravity
+
 [![The two-body solution](http://i.imgur.com/TDEHTcb.gif)][gifv2]
 
 [gifv2]: http://i.imgur.com/TDEHTcb.gifv
@@ -117,7 +130,21 @@ More examples
 3.  The potential energy function is the classic gravitational potential:
 
     ~~~haskell
-    U = m1 * m2 / r
+    U = - m1 * m2 / r
     ~~~
 
 And...that's all you need!
+
+Here is the actual code for the two-body system:
+
+~~~haskell
+twoBody :: System 4 2
+twoBody =
+    mkSystem (vec4 m1 m1 m2 m2)             -- masses
+             (\(V2 r θ) -> let r1 =   r * m2 / (m1 + m2)
+                               r2 = - r * m1 / (m1 + m2)
+                           in  V4 (r1 * cos θ) (r1 * sin θ)
+                                  (r2 * cos θ) (r2 * sin θ)
+             )                              -- coordinates
+             (\(V2 r _) -> - m1 * m2 / r)   -- potential
+~~~
