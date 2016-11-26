@@ -116,6 +116,24 @@ twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
     c0 :: Config 2
     c0 = Cfg (vec2 2 0) (vec2 0 ω0)
 
+spring
+    :: Double -> Double -> Double -> Double -> SysExample
+spring mB mW k x0 = SE "Spring hanging from block" (V3 "r" "x" "θ") s f (toPhase s c0)
+  where
+    s :: System 3 3
+    s = mkSystem (vec3 mB mW mW)                                                  -- masses
+                 (\(V3 r x θ) -> V3 r (r + (1 + x) * sin θ) ((1 + x) * (-cos θ))) -- coordinates
+                 (\(V3 xB xW yW) -> let d = sqrt $ (xW - xB)**2 + yW**2
+                                    in  realToFrac mB * yW             -- gravity
+                                      + realToFrac k * (d - 1)**2 / 2  -- spring
+                                      + (1 - logistic (-1.5) 25 0.1 xB)  -- left rail wall
+                                      + (    logistic   1.5  25 0.1 xB)  -- right rail wall
+                 )                -- potential
+    f :: R 3 -> [V2 Double]
+    f (headTail->(b,w)) = [V2 b 1, (+) <$> V2 0 1 <*> r2vec w]
+    c0 :: Config 3
+    c0 = Cfg (vec3 0 0.5 0) (vec3 0.5 0 x0)
+
 bezier
     :: forall n. KnownNat n
     => V.Vector (n + 1) (V2 Double)
@@ -145,8 +163,9 @@ data SysExampleChoice =
         SECDoublePend Double Double
       | SECPend Double Double
       | SECRoom Double
-      | SECBezier (NE.NonEmpty (V2 Double))
       | SECTwoBody Double Double Double
+      | SECSpring Double Double Double Double
+      | SECBezier (NE.NonEmpty (V2 Double))
 
 parseEO :: Parser ExampleOpts
 parseEO = EO <$> (parseSEC <|> pure (SECDoublePend 1 1))
@@ -165,6 +184,9 @@ parseSEC = subparser . mconcat $
     , command "twobody"    $
         info (helper <*> parseTwoBody    )
         (progDesc "Two-body graviational simulation.  Note that bodies will only orbit if H < 0.")
+    , command "spring"    $
+        info (helper <*> parseSpring    )
+        (progDesc "A spring hanging from a block on a rail, holding up a mass.  Block is constrained to bounce between -1.5 and 1.5.")
     , command "bezier"     $
         info (helper <*> parseBezier    )
         (progDesc "Particle moving along a parameterized bezier curve")
@@ -227,6 +249,33 @@ parseSEC = subparser . mconcat $
                                   <> value 0.5
                                   <> showDefault
                                    )
+    parseSpring
+      = SECSpring <$> option auto ( long "block"
+                                 <> short 'b'
+                                 <> metavar "MASS"
+                                 <> help "Mass of block on rail"
+                                 <> value 2
+                                 <> showDefault
+                                  )
+                  <*> option auto ( long "weight"
+                                 <> short 'w'
+                                 <> metavar "MASS"
+                                 <> help "Mass of weight hanging from spring"
+                                 <> value 1
+                                 <> showDefault
+                                  )
+                  <*> option auto ( short 'k'
+                                 <> metavar "NUM"
+                                 <> help "Spring constant / stiffness of spring"
+                                 <> value 10
+                                 <> showDefault
+                                  )
+                  <*> option auto ( short 'x'
+                                 <> metavar "DIST"
+                                 <> help "Initial displacement of spring"
+                                 <> value 0.1
+                                 <> showDefault
+                                  )
     parseBezier
       = SECBezier <$> option f ( long "points"
                               <> short 'p'
@@ -272,6 +321,7 @@ main = do
       SECPend       d0 ω0        -> pendulum (d0 / 180 * pi) ω0
       SECRoom       d0           -> room (d0 / 180 * pi)
       SECTwoBody    m1 m2 ω0     -> twoBody m1 m2 ω0
+      SECSpring     mB mW k x0   -> spring mB mW k x0
       SECBezier     (p NE.:| ps) -> V.withSized (VV.fromList ps)
                                       (bezier . V.cons p)
 
@@ -424,6 +474,11 @@ pattern V2 :: a -> a -> V2 a
 pattern V2 x y <- (V.toList->[x,y])
   where
     V2 x y = fromJust (V.fromList [x,y])
+
+pattern V3 :: a -> a -> a -> V.Vector 3 a
+pattern V3 x y z <- (V.toList->[x,y,z])
+  where
+    V3 x y z = fromJust (V.fromList [x,y,z])
 
 pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
 pattern V4 x y z a <- (V.toList->[x,y,z,a])
