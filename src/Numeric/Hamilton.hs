@@ -17,6 +17,7 @@ module Numeric.Hamilton
     -- ** Systems
     System
   , mkSystem
+  , mkSystem'
   , underlyingPos
     -- ** States
   , Config(..)
@@ -132,10 +133,8 @@ data System :: Nat -> Nat -> Type where
            , _sysCoords         :: R n -> R m
            , _sysJacobian       :: R n -> L m n
            , _sysJacobian2      :: R n -> V.Vector m (Sym n)
-           , _sysPotential      :: R m -> Double
-           , _sysPotentialGrad  :: R m -> R m
-           , _sysPotential'     :: R n -> Double
-           , _sysPotentialGrad' :: R n -> R n
+           , _sysPotential      :: R n -> Double
+           , _sysPotentialGrad  :: R n -> R n
            }
         -> System m n
 
@@ -166,7 +165,7 @@ underlyingPos = _sysCoords
 pe  :: System m n
     -> R n
     -> Double
-pe Sys{..} q = _sysPotential (_sysCoords q) + _sysPotential' q
+pe = _sysPotential
 
 vec2r
     :: KnownNat n => V.Vector n Double -> R n
@@ -193,10 +192,8 @@ vec2l = fromJust . (\rs -> withRows rs exactDims) . toList . fmap vec2r
 -- underlying cartesian coordinates), the inertia of each of those
 -- underlying coordinates, and the pontential energy function.
 --
--- You can chose to express the potential energy function in terms of the
--- underlying cartesian coordinate system or the generalized coordinate
--- system.  If you supply both, the potential energy is taken to be the sum
--- of the two functions.
+-- The potential energy function is expressed in terms of the genearlized
+-- coordinate space's positions.
 mkSystem
     :: forall m n. (KnownNat m, KnownNat n)
     => R m      -- ^ The "inertia" of each of the @m@ coordinates
@@ -207,15 +204,11 @@ mkSystem
                 -- ^ Conversion function to convert points in the
                 -- generalized coordinate space to the underlying cartesian
                 -- space of the system.
-    -> (forall a. RealFloat a => V.Vector m a -> a)
-                -- ^ The contribution of the potential energy of the system
-                -- from the underlying cartesian coordinate system's
-                -- positions.
     -> (forall a. RealFloat a => V.Vector n a -> a)
-                -- ^ The contribution of the potential energy of the system
-                -- from the generalized coordinate space's positions.
+                -- ^ The potential energy of the system as a function of
+                -- the generalized coordinate space's positions.
     -> System m n
-mkSystem m f u u' =
+mkSystem m f u =
     Sys m
         (vec2r . f . r2vec)
         (tr . vec2l . jacobianT f . r2vec)
@@ -226,12 +219,30 @@ mkSystem m f u u' =
            )
         (u . r2vec)
         (vec2r . grad u . r2vec)
-        (u' . r2vec)
-        (vec2r . grad u' . r2vec)
   where
     j2  :: C.Cofree (V.Vector n) Double
         -> V.Vector n (V.Vector n Double)
     j2 = fmap (fmap C.extract . C.unwrap) . C.unwrap
+
+-- | Convenience wrapper over 'mkSystem' that allows you to specify the
+-- potential energy function in terms of the underlying cartesian
+-- coordinate space.
+mkSystem'
+    :: forall m n. (KnownNat m, KnownNat n)
+    => R m      -- ^ The "inertia" of each of the @m@ coordinates
+                -- in the underlying cartesian space of the system.  This
+                -- should be mass for linear coordinates and rotational
+                -- inertia for angular coordinates.
+    -> (forall a. RealFloat a => V.Vector n a -> V.Vector m a)
+                -- ^ Conversion function to convert points in the
+                -- generalized coordinate space to the underlying cartesian
+                -- space of the system.
+    -> (forall a. RealFloat a => V.Vector m a -> a)
+                -- ^ The potential energy of the system as a function of
+                -- the underlying cartesian coordinate space's positions.
+    -> System m n
+mkSystem' m f u = mkSystem m f (u . f)
+
 
 -- | Compute the generalized momenta conjugate to each generalized
 -- coordinate of a system by giving the configuration-space state of the
@@ -353,7 +364,7 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
          . flip fmap (tr2 j') $ \djdq ->
              -phsMom <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMom
     dHdp = ijmj #> phsMom
-    dHdq = dTdq + trj #> _sysPotentialGrad (_sysCoords phsPos)
+    dHdq = dTdq + _sysPotentialGrad phsPos
 
 tr2
     :: (KnownNat m, KnownNat n, KnownNat o)
