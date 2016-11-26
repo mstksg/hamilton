@@ -43,11 +43,11 @@ pendulum :: Double -> SysExample
 pendulum v0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
   where
     s :: System 2 1
-    s = mkSystem (vec2 1 1                        )
-                 (\(V1 θ)   -> V2 (sin θ) (-cos θ))
-                 (\(V2 _ y) -> y                  )
+    s = mkSystem (vec2 1 1                        )     -- masses
+                 (\(V1 θ)   -> V2 (sin θ) (-cos θ))     -- coordinates
+                 (\(V2 _ y) -> y                  )     -- potential
     f :: R 2 -> [Point Double]
-    f = (:[]) . r2pt
+    f xs = [r2pt xs]
     c0 :: Config 1
     c0 = Cfg (0 :: R 1) (konst v0 :: R 1)
 
@@ -55,13 +55,14 @@ doublePendulum :: Double -> Double -> SysExample
 doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
   where
     s :: System 4 2
-    s = mkSystem (vec4 m1 m1 m2 m2)
+    s = mkSystem (vec4 m1 m1 m2 m2)     -- masses
                  (\(V2 θ1 θ2)     -> V4 (sin θ1)            (-cos θ1)
                                         (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
-                 )
+                 )                      -- coordinates
                  (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
+                                        -- potential
     f :: R 4 -> [Point Double]
-    f = (\(p1,p2) -> [p1,p2]) . bimap r2pt r2pt . split
+    f (split->(xs,ys))= [r2pt xs, r2pt ys]
     c0 :: Config 2
     c0 = Cfg (vec2 (pi/2) 0) (vec2 0 0)
 
@@ -69,17 +70,17 @@ room :: SysExample
 room = SE "Room" (V2 "x" "y") s f (toPhase s c0)
   where
     s :: System 2 2
-    s = mkSystem (vec2 1 1)
-                 id
+    s = mkSystem (vec2 1 1)         -- masses
+                 id                 -- coordinates
                  (\(V2 x y) -> sum [ 2 * y                      -- gravity
                                    , 1 - logistic (-1) 5 0.1 y  -- bottom wall
                                    , logistic 1 5 0.1 y         -- top wall
                                    , 1 - logistic (-2) 5 0.1 x  -- left wall
                                    , logistic 2 5 0.1 x         -- right wall
                                    ]
-                 )
+                 )                  -- potential
     f :: R 2 -> [Point Double]
-    f = (:[]) . r2pt
+    f xs = [r2pt xs]
     c0 :: Config 2
     c0 = Cfg (vec2 (-0.5) 0.5) (vec2 1 0)
 
