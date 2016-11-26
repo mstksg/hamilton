@@ -37,8 +37,8 @@ You only need:
     U = (m1 y1 + m2 y2) * g
     ~~~
 
-And Hamiltonian mechanics steps your generalized coordinates (`θ1` and `θ2`)
-through time, without needing to do any simulation involving
+And that's it! Hamiltonian mechanics steps your generalized coordinates (`θ1`
+and `θ2`) through time, without needing to do any simulation involving
 `x1`/`y1`/`x2`/`y2`!  And you don't need to worry about tension or any other
 stuff like that.  All you need is a description of your coordinate system
 itself, and the potential energy!
@@ -59,6 +59,14 @@ See [documentation][] and [example runner][].
 Example runner
 --------------
 
+Installation:
+
+~~~bash
+$ git clone https://github.com/mstksg/hamilton
+$ cd hamilton
+$ stack install
+~~~
+
 Usage:
 
 ~~~bash
@@ -76,8 +84,40 @@ several example system through time.
 | `doublepend` | Double pendulum, described above                           | `θ1`, `θ2` (angles of bobs)                                         | Masses of each bob                                            |
 | `pend`       | Single pendulum                                            | `θ` (angle of bob)                                                  | Initial angle and velocity of bob                             |
 | `room`       | Object bounding around walled room                         | `x`, `y`                                                            | Initial launch angle of object                                |
-| `twobody`    | Two gravitationally attracted bodies                       | `r`, `θ` (distance between bodies, angle of rotation)               | Masses of bodies and initial angular veocity                  |
+| `twobody`    | Two gravitationally attracted bodies, described below      | `r`, `θ` (distance between bodies, angle of rotation)               | Masses of bodies and initial angular veocity                  |
 | `spring`     | Spring hanging from a block on a rail, holding up a weight | `r`, `x`, `θ` (position of block, spring compression, spring angle) | Masses of block, weight, spring constant, initial compression |
 | `bezier`     | Bead sliding at constant velocity along bezier curve       | `t` (Bezier time parameter)                                         | Control points for arbitrary bezier curve                     |
 
 Call with `--help` (or `[EXAMPLE] --help`) for more information.
+
+More examples
+-------------
+
+[![The two-body solution](http://i.imgur.com/TDEHTcb.gif)][gifv2]
+
+[gifv2]: http://i.imgur.com/TDEHTcb.gifv
+
+1.  The generalized coordinates are the [Jacobi coordinates][] of the system:
+
+    *   `r`, the distance between the two bodies
+    *   `θ`, the current angle of rotation
+
+    ~~~haskell
+    x1 =  m2/(m1+m2) * r * sin θ        -- translating from jacobi coordinates
+    y1 =  m2/(m1+m2) * r * cos θ
+    x2 = -m1/(m1+m2) * r * sin θ
+    y2 = -m1/(m1+m2) * r * cos θ
+    ~~~
+
+[Jacobi coordinates]: https://en.wikipedia.org/wiki/Jacobi_coordinates
+
+2.  The masses/inertias are again `m1` for `x1` and `y1`, and `m2` for `x2` and
+    `y2`
+
+3.  The potential energy function is the classic gravitational potential:
+
+    ~~~haskell
+    U = m1 * m2 / r
+    ~~~
+
+And...that's all you need!
