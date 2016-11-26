@@ -57,6 +57,7 @@ pendulum θ0 ω0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
     s = mkSystem (vec2 1 1                        )     -- masses
                  (\(V1 θ)   -> V2 (sin θ) (-cos θ))     -- coordinates
                  (\(V2 _ y) -> y                  )     -- potential
+                 (\_ -> 0)
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 1
@@ -72,6 +73,7 @@ doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
                  )                      -- coordinates
                  (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
                                         -- potential
+                 (\_ -> 0)
     f :: R 4 -> [V2 Double]
     f (split->(xs,ys))= [r2vec xs, r2vec ys]
     c0 :: Config 2
@@ -90,6 +92,7 @@ room θ = SE "Room" (V2 "x" "y") s f (toPhase s c0)
                                    ,     logistic 2 10 0.1 x     -- right wall
                                    ]
                  )                  -- potential
+                 (\_ -> 0)
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 2
@@ -108,9 +111,8 @@ twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
                                in  V4 (r1 * cos θ) (r1 * sin θ)
                                       (r2 * cos θ) (r2 * sin θ)
                  )                 -- coordinates
-                 (\(V4 x1 y1 x2 y2) -> - realToFrac (m1 * m2)
-                                     / sqrt ((x2 - x1)**2 + (y2 - y1)**2)
-                 )
+                 (\_ -> 0)
+                 (\(V2 r _) -> - realToFrac (m1 * m2) / r)
     f :: R 4 -> [V2 Double]
     f (split->(xs,ys))= [r2vec xs, r2vec ys]
     c0 :: Config 2
@@ -122,13 +124,13 @@ spring mB mW k x0 = SE "Spring hanging from block" (V3 "r" "x" "θ") s f (toPhas
   where
     s :: System 3 3
     s = mkSystem (vec3 mB mW mW)                                                  -- masses
-                 (\(V3 r x θ) -> V3 r (r + (1 + x) * sin θ) ((1 + x) * (-cos θ))) -- coordinates
-                 (\(V3 xB xW yW) -> let d = sqrt $ (xW - xB)**2 + yW**2
-                                    in  realToFrac mB * yW             -- gravity
-                                      + realToFrac k * (d - 1)**2 / 2  -- spring
-                                      + (1 - logistic (-1.5) 25 0.1 xB)  -- left rail wall
-                                      + (    logistic   1.5  25 0.1 xB)  -- right rail wall
-                 )                -- potential
+                 (\(V3 r x θ)  -> V3 r (r + (1 + x) * sin θ) ((1 + x) * (-cos θ))) -- coordinates
+                 (\(V3 _ _ yW) -> realToFrac mB * yW            -- gravity
+                 )
+                 (\(V3 r x _) -> realToFrac k * x**2 / 2        -- spring
+                              + (1 - logistic (-1.5) 25 0.1 r)  -- left rail wall
+                              + (    logistic   1.5  25 0.1 r)  -- right rail wall
+                 )
     f :: R 3 -> [V2 Double]
     f (headTail->(b,w)) = [V2 b 1, (+) <$> V2 0 1 <*> r2vec w]
     c0 :: Config 3
@@ -149,6 +151,7 @@ bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
                                    ,     logistic (realToFrac maxX) 10 0.1 x  -- right wall
                                    ]
                  )                                                      -- potential (box)
+                 (\_ -> 0)
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 1
