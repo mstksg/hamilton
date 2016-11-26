@@ -295,16 +295,17 @@ main = do
               xb   = (- recip soZoom, recip soZoom)
               infobox = vertCat . map (string defAttr) $
                           [ printf "[ %s ]" seName
-                          , printf "<%s>: <%s>" qVec . intercalate ", "
-                             . map (printf "%.5f") . r2list . phsPos   $ p
-                          , printf "d/dt<%s>: <%s>" qVec . intercalate ", "
-                             . map (printf "%.5f") . r2list . velocities seSystem $ p
-                          , printf "KE: %.5f" . keP seSystem           $ p
-                          , printf "PE: %.5f" . pe seSystem . phsPos   $ p
-                          , printf "H : %.5f" . hamiltonian seSystem   $ p
+                          , printf " <%s>   : <%s>" qVec . intercalate ", "
+                             . map (printf "%.4f") . r2list . phsPos   $ p
+                          , printf "d<%s>/dt: <%s>" qVec . intercalate ", "
+                             . map (printf "%.4f") . r2list . velocities seSystem $ p
+                          , printf "KE: %.4f" . keP seSystem           $ p
+                          , printf "PE: %.4f" . pe seSystem . phsPos   $ p
+                          , printf "H : %.4f" . hamiltonian seSystem   $ p
                           , " "
-                          , printf "rate: x%.2f" $ soRate
-                          , printf "hist: %d"    $ soHist
+                          , printf "rate: x%.2f <>" $ soRate
+                          , printf "hist: % 5d []" $ soHist
+                          , printf "zoom: x%.2f -+" $ soZoom
                           ]
               pts  = (`zip` ptAttrs) . seDraw . underlyingPos seSystem . phsPos
                    $ p
@@ -331,10 +332,8 @@ processEvt = \case
     EvKey (KChar '-') []      -> Just $ SEZoom 0.5
     EvKey (KChar '>') []      -> Just $ SERate 1.5
     EvKey (KChar '<') []      -> Just $ SERate (1/1.5)
-    EvKey (KChar ']') []      -> Just $ SEHist 1
-    EvKey (KChar '[') []      -> Just $ SEHist (-1)
-    EvKey (KChar '}') []      -> Just $ SEHist 5
-    EvKey (KChar '{') []      -> Just $ SEHist (-5)
+    EvKey (KChar ']') []      -> Just $ SEHist 5
+    EvKey (KChar '[') []      -> Just $ SEHist (-5)
     _                         -> Nothing
 
 data RangeRatio = RR { -- | Where on the screen (0 to 1) to place the other axis
