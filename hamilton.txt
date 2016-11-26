@@ -20,8 +20,8 @@ module Numeric.Hamilton
 --   For the most part, you are supposed to be able to ignore <tt>m</tt>.
 --   <tt>m</tt> is only provided because it's useful when plotting/drawing
 --   the system with a given state back in rectangular coordinates. (The
---   only functions that use the <tt>m</tt> at the moment are
---   <a>underlyingPos</a> and <a>underlyingPE</a>)
+--   only function that use the <tt>m</tt> at the moment is
+--   <a>underlyingPos</a>)
 --   
 --   A <tt><a>System</a> m n</tt>'s state is described using a
 --   <tt><a>Config</a> n</tt> (which describes the system in configuration
@@ -33,17 +33,20 @@ data System :: Nat -> Nat -> Type
 --   its coordinate space (by a function from the generalized coordinates
 --   to the underlying cartesian coordinates), the inertia of each of those
 --   underlying coordinates, and the pontential energy function.
-mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat a => Vector n a -> Vector m a) -> (forall a. RealFloat a => Vector m a -> a) -> System m n
+--   
+--   The potential energy function is expressed in terms of the genearlized
+--   coordinate space's positions.
+mkSystem :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat a => Vector n a -> Vector m a) -> (forall a. RealFloat a => Vector n a -> a) -> System m n
+
+-- | Convenience wrapper over <a>mkSystem</a> that allows you to specify
+--   the potential energy function in terms of the underlying cartesian
+--   coordinate space.
+mkSystem' :: forall m n. (KnownNat m, KnownNat n) => R m -> (forall a. RealFloat a => Vector n a -> Vector m a) -> (forall a. RealFloat a => Vector m a -> a) -> System m n
 
 -- | Converts the position of generalized coordinates of a system to the
 --   coordinates of the system's underlying cartesian coordinate system.
 --   Useful for plotting/drawing the system in cartesian space.
 underlyingPos :: System m n -> R n -> R m
-
--- | The potential energy of a system, given the position in the underlying
---   cartesian coordinate space of the system. Useful for plotting/drawing
---   the system's potential energy function in cartesian space.
-underlyingPE :: System m n -> R m -> Double
 
 -- | Represents the full state of a system of <tt>n</tt> generalized
 --   coordinates in configuration space (informally, "positions and
