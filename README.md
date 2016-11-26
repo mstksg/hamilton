@@ -110,19 +110,17 @@ More examples
 
 [gifv2]: http://i.imgur.com/TDEHTcb.gifv
 
-1.  The generalized coordinates are the [Jacobi coordinates][] of the system:
+1.  The generalized coordinates are just:
 
     *   `r`, the distance between the two bodies
     *   `θ`, the current angle of rotation
 
     ~~~haskell
-    x1 =  m2/(m1+m2) * r * sin θ        -- translating from jacobi coordinates
+    x1 =  m2/(m1+m2) * r * sin θ        -- assuming (0,0) is the center of mass
     y1 =  m2/(m1+m2) * r * cos θ
     x2 = -m1/(m1+m2) * r * sin θ
     y2 = -m1/(m1+m2) * r * cos θ
     ~~~
-
-[Jacobi coordinates]: https://en.wikipedia.org/wiki/Jacobi_coordinates
 
 2.  The masses/inertias are again `m1` for `x1` and `y1`, and `m2` for `x2` and
     `y2`
