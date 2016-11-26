@@ -95,6 +95,27 @@ room = SE "Room" (V2 "x" "y") s f (toPhase s c0)
     c0 :: Config 2
     c0 = Cfg (vec2 (-0.5) 0.5) (vec2 1 0)
 
+twoBody :: Double -> Double -> Double -> SysExample
+twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
+  where
+    mT :: Double
+    mT = m1 + m2
+    s :: System 4 2
+    s = mkSystem (vec4 m1 m1 m2 m2) -- masses
+                 -- r1 and r2 are calculated from the center of mass
+                 (\(V2 r θ) -> let r1 = r * realToFrac (m2 / mT)
+                                   r2 = r * realToFrac (-m1 / mT)
+                               in  V4 (r1 * cos θ) (r1 * sin θ)
+                                      (r2 * cos θ) (r2 * sin θ)
+                 )                 -- coordinates
+                 (\(V4 x1 y1 x2 y2) -> - realToFrac (m1 * m2)
+                                     / sqrt ((x2 - x1)**2 + (y2 - y1)**2)
+                 )
+    f :: R 4 -> [V2 Double]
+    f (split->(xs,ys))= [r2vec xs, r2vec ys]
+    c0 :: Config 2
+    c0 = Cfg (vec2 2 0) (vec2 0 ω0)
+
 bezier
     :: forall n. KnownNat n
     => V.Vector (n + 1) (V2 Double)
@@ -125,6 +146,7 @@ data SysExampleChoice =
       | SECPend Double
       | SECRoom
       | SECBezier (NE.NonEmpty (V2 Double))
+      | SECTwoBody Double Double Double
 
 parseEO :: Parser ExampleOpts
 parseEO = EO <$> (parseSEC <|> pure (SECDoublePend 1 1))
@@ -140,6 +162,9 @@ parseSEC = subparser . mconcat $
     , command "room"       $
         info (helper <*> parseRoom      )
         (progDesc "Ball in room, bouncing off of walls")
+    , command "twobody"    $
+        info (helper <*> parseTwoBody    )
+        (progDesc "Two-body graviational simulation.  Note that bodies will only orbit if H < 0.")
     , command "bezier"     $
         info (helper <*> parseBezier    )
         (progDesc "Particle moving along a parameterized bezier curve")
@@ -169,6 +194,26 @@ parseSEC = subparser . mconcat $
                                       )
     parseRoom
       = pure SECRoom
+    parseTwoBody
+      = SECTwoBody <$> option auto ( long "m1"
+                                  <> metavar "MASS"
+                                  <> help "Mass of first body"
+                                  <> value 5
+                                  <> showDefault
+                                   )
+                   <*> option auto ( long "m2"
+                                  <> metavar "MASS"
+                                  <> help "Mass of second body"
+                                  <> value 0.5
+                                  <> showDefault
+                                   )
+                   <*> option auto ( long "vel"
+                                  <> short 'v'
+                                  <> metavar "VELOCITY"
+                                  <> help "Initial angular velocity of system"
+                                  <> value 0.5
+                                  <> showDefault
+                                   )
     parseBezier
       = SECBezier <$> option f ( long "points"
                               <> short 'p'
@@ -212,6 +257,7 @@ main = do
       SECDoublePend m1 m2        -> doublePendulum m1 m2
       SECPend       v0           -> pendulum v0
       SECRoom                    -> room
+      SECTwoBody    m1 m2 ω0     -> twoBody m1 m2 ω0
       SECBezier     (p NE.:| ps) -> V.withSized (VV.fromList ps)
                                       (bezier . V.cons p)
 
@@ -242,7 +288,7 @@ main = do
     loop :: Vty -> IORef SimOpts -> SysExample -> IO ()
     loop vty oRef SE{..} = go M.empty seInit
       where
-        qVec = intercalate ", " . V.toList $ seCoords
+        qVec = intercalate "," . V.toList $ seCoords
         go hists p = do
           SO{..} <- readIORef oRef
           let p'   = stepHam (soRate / fps) seSystem p  -- progress the simulation
@@ -251,9 +297,11 @@ main = do
                           [ printf "[ %s ]" seName
                           , printf "<%s>: <%s>" qVec . intercalate ", "
                              . map (printf "%.5f") . r2list . phsPos   $ p
+                          , printf "d/dt<%s>: <%s>" qVec . intercalate ", "
+                             . map (printf "%.5f") . r2list . velocities seSystem $ p
                           , printf "KE: %.5f" . keP seSystem           $ p
                           , printf "PE: %.5f" . pe seSystem . phsPos   $ p
-                          , printf "H: %.5f" . hamiltonian seSystem    $ p
+                          , printf "H : %.5f" . hamiltonian seSystem   $ p
                           , " "
                           , printf "rate: x%.2f" $ soRate
                           , printf "hist: %d"    $ soHist
@@ -364,7 +412,6 @@ pattern V2 x y <- (V.toList->[x,y])
   where
     V2 x y = fromJust (V.fromList [x,y])
 
-type V4 = V.Vector 4
 pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
 pattern V4 x y z a <- (V.toList->[x,y,z,a])
   where
