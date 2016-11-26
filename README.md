@@ -55,3 +55,17 @@ See [documentation][] and [example runner][].
 
 [documentation]: https://mstksg.github.io/hamilton/
 [example runner]: https://github.com/mstksg/hamilton/blob/master/app/Examples.hs
+
+Example runner
+--------------
+
+The example runner is a command line application that plots the progression of
+several example system through time.  Here are some examples:
+
+| Example | Description | Coordinates | Options |
+|---------|-------------|-------------|---------|
+| `doublepend` | Double pendulum, described above. | `θ1`, `θ2` (angles of bobs) | Masses of each bob |
+| `pend` | Single pendulum | `θ` (angle of bob) | Initial angle and velocity of bob |
+| `room` | Object bounding around walled room | `x`, `y` | None |
+| `twobody` | Two gravitationally attracted bodies | `r`, `θ` (distance between bodies, angle of rotation) | Masses of bodies and initial angular veocity |
+| `bezier` | Bead sliding along bezier curve | `t` (Bezier time parameter) | Control points for arbitrary bezier curve |
