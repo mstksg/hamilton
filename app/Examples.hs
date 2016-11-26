@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFoldable       #-}
 {-# LANGUAGE DeriveFunctor        #-}
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE PatternSynonyms      #-}
@@ -11,6 +12,7 @@
 {-# LANGUAGE TupleSections        #-}
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns         #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -38,8 +40,6 @@ import qualified Data.Vector.Generic.Sized           as VG
 import qualified Data.Vector.Sized                   as V
 import qualified Data.Vector.Storable                as VS
 
-deriving instance Ord Color
-
 data SysExample where
     SE :: (KnownNat m, KnownNat n)
        => { seName   :: String
@@ -54,9 +54,9 @@ pendulum :: Double -> Double -> SysExample
 pendulum θ0 ω0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
   where
     s :: System 2 1
-    s = mkSystem (vec2 1 1                        )     -- masses
-                 (\(V1 θ)   -> V2 (sin θ) (-cos θ))     -- coordinates
-                 (\(V2 _ y) -> y                  )     -- potential
+    s = mkSystem' (vec2 1 1                        )     -- masses
+                  (\(V1 θ)   -> V2 (sin θ) (-cos θ))     -- coordinates
+                  (\(V2 _ y) -> y                  )     -- potential
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 1
@@ -66,12 +66,12 @@ doublePendulum :: Double -> Double -> SysExample
 doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
   where
     s :: System 4 2
-    s = mkSystem (vec4 m1 m1 m2 m2)     -- masses
-                 (\(V2 θ1 θ2)     -> V4 (sin θ1)            (-cos θ1)
-                                        (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
-                 )                      -- coordinates
-                 (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
-                                        -- potential
+    s = mkSystem' (vec4 m1 m1 m2 m2)     -- masses
+                  (\(V2 θ1 θ2)     -> V4 (sin θ1)            (-cos θ1)
+                                         (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
+                  )                      -- coordinates
+                  (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
+                                         -- potential
     f :: R 4 -> [V2 Double]
     f (split->(xs,ys))= [r2vec xs, r2vec ys]
     c0 :: Config 2
@@ -108,9 +108,7 @@ twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
                                in  V4 (r1 * cos θ) (r1 * sin θ)
                                       (r2 * cos θ) (r2 * sin θ)
                  )                 -- coordinates
-                 (\(V4 x1 y1 x2 y2) -> - realToFrac (m1 * m2)
-                                     / sqrt ((x2 - x1)**2 + (y2 - y1)**2)
-                 )
+                 (\(V2 r _) -> - realToFrac (m1 * m2) / r)
     f :: R 4 -> [V2 Double]
     f (split->(xs,ys))= [r2vec xs, r2vec ys]
     c0 :: Config 2
@@ -122,17 +120,16 @@ spring mB mW k x0 = SE "Spring hanging from block" (V3 "r" "x" "θ") s f (toPhas
   where
     s :: System 3 3
     s = mkSystem (vec3 mB mW mW)                                                  -- masses
-                 (\(V3 r x θ) -> V3 r (r + (1 + x) * sin θ) ((1 + x) * (-cos θ))) -- coordinates
-                 (\(V3 xB xW yW) -> let d = sqrt $ (xW - xB)**2 + yW**2
-                                    in  realToFrac mB * yW             -- gravity
-                                      + realToFrac k * (d - 1)**2 / 2  -- spring
-                                      + (1 - logistic (-1.5) 25 0.1 xB)  -- left rail wall
-                                      + (    logistic   1.5  25 0.1 xB)  -- right rail wall
-                 )                -- potential
+                 (\(V3 r x θ)  -> V3 r (r + (1 + x) * sin θ) ((1 + x) * (-cos θ))) -- coordinates
+                 (\(V3 r x θ) -> realToFrac k * x**2 / 2        -- spring
+                              + (1 - logistic (-1.5) 25 0.1 r)  -- left rail wall
+                              + (    logistic   1.5  25 0.1 r)  -- right rail wall
+                              + realToFrac mB * ((1 + x) * (-cos θ))  -- gravity
+                 )
     f :: R 3 -> [V2 Double]
-    f (headTail->(b,w)) = [V2 b 1, (+) <$> V2 0 1 <*> r2vec w]
+    f (headTail->(b,w)) = [V2 b 1, V2 0 1 + r2vec w]
     c0 :: Config 3
-    c0 = Cfg (vec3 0 0.5 0) (vec3 0.5 0 x0)
+    c0 = Cfg (vec3 0 x0 0) (vec3 1 0 (-0.5))
 
 bezier
     :: forall n. KnownNat n
@@ -143,18 +140,13 @@ bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
     s :: System 2 1
     s = mkSystem (vec2 1 1)                                             -- masses
                  (\(V1 t) -> bezierCurve (fmap realToFrac <$> ps) t)    -- coordinates
-                 (\(V2 x y) -> sum [ 1 - logistic (realToFrac minY) 10 0.1 y  -- bottom wall
-                                   ,     logistic (realToFrac maxY) 10 0.1 y  -- top wall
-                                   , 1 - logistic (realToFrac minX) 10 0.1 x  -- left wall
-                                   ,     logistic (realToFrac maxX) 10 0.1 x  -- right wall
-                                   ]
-                 )                                                      -- potential (box)
+                 (\(V1 t) -> (1 - logistic 0 5 0.05 t)           -- left wall
+                           +      logistic 1 5 0.05 t            -- right wall
+                 )
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 1
     c0 = Cfg (0.5 :: R 1) (0.25 :: R 1)
-    V2 minX minY = V.foldl1' (liftA2 min) $ ps
-    V2 maxX maxY = V.foldl1' (liftA2 max) $ ps
 
 
 data ExampleOpts = EO { eoChoice :: SysExampleChoice }
@@ -520,3 +512,20 @@ bezierCurve ps t =
     n `choose` k = factorial n `div` (factorial (n - k) * factorial k)
     factorial :: Int -> Int
     factorial m = product [1..m]
+
+instance (KnownNat n, Num a) => Num (V.Vector n a) where
+    (+) = liftA2 (+)
+    (-) = liftA2 (-)
+    (*) = liftA2 (*)
+    negate = fmap negate
+    abs = fmap abs
+    signum = fmap signum
+    fromInteger = pure . fromInteger
+
+instance (KnownNat n, Fractional a) => Fractional (V.Vector n a) where
+    (/) = liftA2 (/)
+    recip = fmap recip
+    fromRational = pure . fromRational
+
+deriving instance Ord Color
+
