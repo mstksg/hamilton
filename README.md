@@ -59,22 +59,23 @@ See [documentation][] and [example runner][].
 Example runner
 --------------
 
-The example runner is a command line application that plots the progression of
-several example system through time.  Here are some examples:
-
-| Example      | Description                          | Coordinates                                           | Options                                      |
-|--------------|--------------------------------------|-------------------------------------------------------|----------------------------------------------|
-| `doublepend` | Double pendulum, described above.    | `θ1`, `θ2` (angles of bobs)                           | Masses of each bob                           |
-| `pend`       | Single pendulum                      | `θ` (angle of bob)                                    | Initial angle and velocity of bob            |
-| `room`       | Object bounding around walled room   | `x`, `y`                                              | Initial launch angle of object               |
-| `twobody`    | Two gravitationally attracted bodies | `r`, `θ` (distance between bodies, angle of rotation) | Masses of bodies and initial angular veocity |
-| `bezier`     | Bead sliding along bezier curve      | `t` (Bezier time parameter)                           | Control points for arbitrary bezier curve    |
-
-Call:
+Usage:
 
 ~~~bash
+$ hamilton-examples [EXAMPLE] (options)
 $ hamilton-examples --help
 $ hamilton-examples [EXAMPLE] --help
 ~~~
 
-for more details.
+The example runner is a command line application that plots the progression of
+several example system through time.
+
+| Example      | Description                                          | Coordinates                                           | Options                                      |
+|--------------|------------------------------------------------------|-------------------------------------------------------|----------------------------------------------|
+| `doublepend` | Double pendulum, described above                     | `θ1`, `θ2` (angles of bobs)                           | Masses of each bob                           |
+| `pend`       | Single pendulum                                      | `θ` (angle of bob)                                    | Initial angle and velocity of bob            |
+| `room`       | Object bounding around walled room                   | `x`, `y`                                              | Initial launch angle of object               |
+| `twobody`    | Two gravitationally attracted bodies                 | `r`, `θ` (distance between bodies, angle of rotation) | Masses of bodies and initial angular veocity |
+| `bezier`     | Bead sliding at constant velocity along bezier curve | `t` (Bezier time parameter)                           | Control points for arbitrary bezier curve    |
+
+Call with `--help` (or `[EXAMPLE] --help`) for more information.
