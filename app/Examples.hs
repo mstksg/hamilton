@@ -1,12 +1,15 @@
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveFoldable       #-}
 {-# LANGUAGE DeriveFunctor        #-}
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE PatternSynonyms      #-}
 {-# LANGUAGE RecordWildCards      #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE ViewPatterns         #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -14,10 +17,12 @@
 import           Control.Concurrent
 import           Control.Monad
 import           Data.Bifunctor
+import           Data.Foldable
 import           Data.IORef
 import           Data.List
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Proxy
 import           GHC.TypeLits
 import           Graphics.Vty hiding                 (Config, (<|>))
 import           Numeric.Hamilton
@@ -26,7 +31,9 @@ import           Options.Applicative
 import           System.Exit
 import           Text.Printf
 import           Text.Read
+import qualified Data.List.NonEmpty                  as NE
 import qualified Data.Map.Strict                     as M
+import qualified Data.Vector                         as VV
 import qualified Data.Vector.Generic.Sized           as VG
 import qualified Data.Vector.Sized                   as V
 import qualified Data.Vector.Storable                as VS
@@ -89,31 +96,26 @@ room = SE "Room" (V2 "x" "y") s f (toPhase s c0)
     c0 = Cfg (vec2 (-0.5) 0.5) (vec2 1 0)
 
 bezier
-    :: V4 (V2 Double)
+    :: forall n. KnownNat n
+    => V.Vector (n + 1) (V2 Double)
     -> SysExample
 bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
   where
     s :: System 2 1
-    s = mkSystem (vec2 1 1)             -- masses
-                 (\(V1 t) -> foldl' (liftA2 (+)) (pure 0)
-                      $ V.zipWith4 (\a b c p -> (* (a * b * c)) . realToFrac <$> p)
-                          (V4 1          3          3      1     )
-                          (V4 ((1-t)**3) ((1-t)**2) (1-t)  1     )
-                          (V4 1          t          (t**2) (t**3))
-                          ps
-                 )    -- coordinates
+    s = mkSystem (vec2 1 1)                                             -- masses
+                 (\(V1 t) -> bezierCurve (fmap realToFrac <$> ps) t)    -- coordinates
                  (\(V2 x y) -> sum [ 1 - logistic (realToFrac minY) 10 0.1 y  -- bottom wall
-                                   , logistic (realToFrac maxY) 10 0.1 y      -- top wall
+                                   ,     logistic (realToFrac maxY) 10 0.1 y  -- top wall
                                    , 1 - logistic (realToFrac minX) 10 0.1 x  -- left wall
-                                   , logistic (realToFrac maxX) 10 0.1 x      -- right wall
+                                   ,     logistic (realToFrac maxX) 10 0.1 x  -- right wall
                                    ]
-                 )    -- potential (box)
+                 )                                                      -- potential (box)
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 1
-    c0 = Cfg (0.1 :: R 1) (0.25 :: R 1)
-    V2 minX minY = V.foldl1' (liftA2 min) ps
-    V2 maxX maxY = V.foldl1' (liftA2 max) ps
+    c0 = Cfg (0.5 :: R 1) (0.25 :: R 1)
+    V2 minX minY = V.foldl1' (liftA2 min) $ ps
+    V2 maxX maxY = V.foldl1' (liftA2 max) $ ps
 
 
 data ExampleOpts = EO { eoChoice :: SysExampleChoice }
@@ -122,7 +124,7 @@ data SysExampleChoice =
         SECDoublePend Double Double
       | SECPend Double
       | SECRoom
-      | SECBezier (V4 (V2 Double))
+      | SECBezier (NE.NonEmpty (V2 Double))
 
 parseEO :: Parser ExampleOpts
 parseEO = EO <$> (parseSEC <|> pure (SECDoublePend 1 1))
@@ -171,11 +173,15 @@ parseSEC = subparser . mconcat $
       = SECBezier <$> option f ( long "points"
                               <> short 'p'
                               <> metavar "POINTS"
-                              <> help "List of four control points, as tuples"
-                              <> value (V4 (V2 (-1) (-1)) (V2 (-2) 1) (V2 1 1) (V2 2 (-1)))
-                              <> showDefaultWith (show . map (\(V2 x y) -> (x, y)) . V.toList)
+                              <> help "List of control points (at least one), as tuples"
+                              <> value (V2 (-1) (-1) NE.:| [V2 (-2) 1, V2 0 1, V2 1 (-1), V2 2 1])
+                              <> showDefaultWith (show . map (\(V2 x y) -> (x, y)) . toList)
                                )
-      where f = maybeReader $ V.fromList . map (\(x, y) -> V2 x y) <=< readMaybe
+      where f = eitherReader $ \s -> do
+              ps  <- maybe (Left "Bad parse") Right
+                  $ readMaybe s
+              maybe (Left "At least one control point required") Right
+                  $ NE.nonEmpty (uncurry V2 <$> ps)
 
 data SimOpts = SO { soZoom :: Double
                   , soRate :: Double
@@ -203,10 +209,11 @@ main = do
     opts <- newIORef $ SO 0.5 1 25
 
     t <- forkIO . loop vty opts $ case eoChoice of
-      SECDoublePend m1 m2 -> doublePendulum m1 m2
-      SECPend       v0    -> pendulum v0
-      SECRoom             -> room
-      SECBezier     ps    -> bezier ps
+      SECDoublePend m1 m2        -> doublePendulum m1 m2
+      SECPend       v0           -> pendulum v0
+      SECRoom                    -> room
+      SECBezier     (p NE.:| ps) -> V.withSized (VV.fromList ps)
+                                      (bezier . V.cons p)
 
 
     forever $ do
@@ -381,3 +388,20 @@ logistic pos ht width = \x -> ht / (1 + exp (- beta * (x - pos)))
   where
     beta = log (0.9 / (1 - 0.9)) / width
 
+
+bezierCurve
+    :: forall n f a. (KnownNat n, Applicative f, Num a)
+    => V.Vector (n + 1) (f a)
+    -> a
+    -> f a
+bezierCurve ps t =
+      foldl' (liftA2 (+)) (pure 0)
+    . V.imap (\i -> fmap ((* (fromIntegral (n' `choose` i) * (1 - t)^(n' - i) * t^i))))
+    $ ps
+  where
+    n' :: Int
+    n' = fromInteger $ natVal (Proxy @n)
+    choose :: Int -> Int -> Int
+    n `choose` k = factorial n `div` (factorial (n - k) * factorial k)
+    factorial :: Int -> Int
+    factorial m = product [1..m]
