@@ -50,8 +50,8 @@ data SysExample where
           }
        -> SysExample
 
-pendulum :: Double -> SysExample
-pendulum v0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
+pendulum :: Double -> Double -> SysExample
+pendulum θ0 ω0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
   where
     s :: System 2 1
     s = mkSystem (vec2 1 1                        )     -- masses
@@ -60,7 +60,7 @@ pendulum v0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 1
-    c0 = Cfg (0 :: R 1) (konst v0 :: R 1)
+    c0 = Cfg (konst θ0 :: R 1) (konst ω0 :: R 1)
 
 doublePendulum :: Double -> Double -> SysExample
 doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
@@ -143,7 +143,7 @@ data ExampleOpts = EO { eoChoice :: SysExampleChoice }
 
 data SysExampleChoice =
         SECDoublePend Double Double
-      | SECPend Double
+      | SECPend Double Double
       | SECRoom
       | SECBezier (NE.NonEmpty (V2 Double))
       | SECTwoBody Double Double Double
@@ -172,10 +172,17 @@ parseSEC = subparser . mconcat $
     ]
   where
     parsePend
-      = SECPend       <$> option auto ( long "vel"
+      = SECPend       <$> option auto ( long "angle"
+                                     <> short 'a'
+                                     <> metavar "ANGLE"
+                                     <> help "Intitial angle (in degrees) of bob, from vertical"
+                                     <> value 0
+                                     <> showDefault
+                                      )
+                      <*> option auto ( long "vel"
                                      <> short 'v'
                                      <> metavar "VELOCITY"
-                                     <> help "Initial rightward velocity of bob"
+                                     <> help "Initial rightward angular velocity of bob"
                                      <> value 1
                                      <> showDefault
                                       )
@@ -255,7 +262,7 @@ main = do
 
     t <- forkIO . loop vty opts $ case eoChoice of
       SECDoublePend m1 m2        -> doublePendulum m1 m2
-      SECPend       v0           -> pendulum v0
+      SECPend       d0 ω0        -> pendulum (d0 / 180 * pi) ω0
       SECRoom                    -> room
       SECTwoBody    m1 m2 ω0     -> twoBody m1 m2 ω0
       SECBezier     (p NE.:| ps) -> V.withSized (VV.fromList ps)
