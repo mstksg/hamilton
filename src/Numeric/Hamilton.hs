@@ -58,7 +58,9 @@ module Numeric.Hamilton
     -- ** Over configuration space
     -- | Convenience wrappers over the normal phase-space
     -- steppers/simulators that allow you to provide input and expect
-    -- output in configuration space instead of in phase space.
+    -- output in configuration space instead of in phase space.  Note that
+    -- the simulation itself still runs in phase space, so these all
+    -- require conversions to and from phase space under the hood.
   , stepHamC
   , evolveHamC
   , evolveHamC'
@@ -99,10 +101,10 @@ import qualified Numeric.LinearAlgebra        as LA
 data Config :: Nat -> Type where
     Cfg :: { -- | The current values ("positions") of each of the @n@
              -- generalized coordinates
-             cfgPos :: !(R n)
+             cfgPositions :: !(R n)
              -- | The current rate of changes ("velocities") of each of the
              -- @n@ generalized coordinates
-           , cfgVel :: !(R n)
+           , cfgVelocities :: !(R n)
            }
         -> Config n
   deriving (Generic)
@@ -128,10 +130,10 @@ deriving instance KnownNat n => Show (Config n)
 data Phase :: Nat -> Type where
     Phs :: { -- | The current values ("positions") of each of the @n@
              -- generalized coordinates.
-             phsPos :: !(R n)
+             phsPositions :: !(R n)
              -- | The current conjugate momenta ("momentums") to each of
              -- the @n@ generalized coordinates
-           , phsMom :: !(R n)
+           , phsMomenta :: !(R n)
            }
         -> Phase n
   deriving (Generic)
@@ -270,14 +272,17 @@ mkSystem' m f u = mkSystem m f (u . f)
 -- | Compute the generalized momenta conjugate to each generalized
 -- coordinate of a system by giving the configuration-space state of the
 -- system.
+--
+-- Note that getting the momenta from a @'Phase' n@ involves just using
+-- 'phsMomenta'.
 momenta
     :: (KnownNat m, KnownNat n)
     => System m n
     -> Config n
     -> R n
-momenta Sys{..} Cfg{..} = tr j #> diag _sysInertia #> j #> cfgVel
+momenta Sys{..} Cfg{..} = tr j #> diag _sysInertia #> j #> cfgVelocities
   where
-    j = _sysJacobian cfgPos
+    j = _sysJacobian cfgPositions
 
 -- | Convert a configuration-space representaiton of the state of the
 -- system to a phase-space representation.
@@ -292,7 +297,7 @@ toPhase
     => System m n
     -> Config n
     -> Phase n
-toPhase s = Phs <$> cfgPos <*> momenta s
+toPhase s = Phs <$> cfgPositions <*> momenta s
 
 -- | The kinetic energy of a system, given the system's state in
 -- configuration space.
@@ -301,7 +306,7 @@ keC :: (KnownNat m, KnownNat n)
     -> Config n
     -> Double
 keC s = do
-    vs <- cfgVel
+    vs <- cfgVelocities
     ps <- momenta s
     return $ (vs <.> ps) / 2
 
@@ -315,19 +320,22 @@ lagrangian
     -> Double
 lagrangian s = do
     t <- keC s
-    u <- pe s . cfgPos
+    u <- pe s . cfgPositions
     return (t - u)
 
 -- | Compute the rate of change of each generalized coordinate by giving
 -- the state of the system in phase space.
+--
+-- Note that getting the velocities from a @'Config' n@ involves just using
+-- 'cfgVelocities'.
 velocities
     :: (KnownNat m, KnownNat n)
     => System m n
     -> Phase n
     -> R n
-velocities Sys{..} Phs{..} = inv jmj #> phsMom
+velocities Sys{..} Phs{..} = inv jmj #> phsMomenta
   where
-    j   = _sysJacobian phsPos
+    j   = _sysJacobian phsPositions
     jmj = tr j <> diag _sysInertia <> j
 
 -- | Invert 'toPhase' and convert a description of a system's state in
@@ -341,7 +349,7 @@ fromPhase
     => System m n
     -> Phase n
     -> Config n
-fromPhase s = Cfg <$> phsPos <*> velocities s
+fromPhase s = Cfg <$> phsPositions <*> velocities s
 
 -- | The kinetic energy of a system, given the system's state in
 -- phase space.
@@ -350,7 +358,7 @@ keP :: (KnownNat m, KnownNat n)
     -> Phase n
     -> Double
 keP s = do
-    ps <- phsMom
+    ps <- phsMomenta
     vs <- velocities s
     return $ (vs <.> ps) / 2
 
@@ -363,7 +371,7 @@ hamiltonian
     -> Double
 hamiltonian s = do
     t <- keP s
-    u <- pe s . phsPos
+    u <- pe s . phsPositions
     return (t + u)
 
 -- | The "hamiltonian equations" for a given system at a given state in
@@ -378,16 +386,16 @@ hamEqs
 hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
   where
     mm   = diag _sysInertia
-    j    = _sysJacobian phsPos
+    j    = _sysJacobian phsPositions
     trj  = tr j
-    j'   = unSym <$> _sysJacobian2 phsPos
+    j'   = unSym <$> _sysJacobian2 phsPositions
     jmj  = trj <> mm <> j
     ijmj = inv jmj
     dTdq = vec2r
          . flip fmap (tr2 j') $ \djdq ->
-             -phsMom <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMom
-    dHdp = ijmj #> phsMom
-    dHdq = dTdq + _sysPotentialGrad phsPos
+             -phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta
+    dHdp = ijmj #> phsMomenta
+    dHdq = dTdq + _sysPotentialGrad phsPositions
 
 tr2
     :: (KnownNat m, KnownNat n, KnownNat o)
@@ -449,7 +457,7 @@ evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
     ts' = VG.fromSized . VG.convert $ ts
     n = fromInteger $ natVal (Proxy @n)
     fromPs :: Phase n -> LA.Vector Double
-    fromPs p = LA.vjoin . map extract $ [phsPos p, phsMom p]
+    fromPs p = LA.vjoin . map extract $ [phsPositions p, phsMomenta p]
     toPs :: LA.Vector Double -> Phase n
     toPs v = Phs pP pM
       where

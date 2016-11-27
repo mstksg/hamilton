@@ -362,18 +362,18 @@ main = do
               infobox = vertCat . map (string defAttr) $
                           [ printf "[ %s ]" seName
                           , printf " <%s>   : <%s>" qVec . intercalate ", "
-                             . map (printf "%.4f") . r2list . phsPos   $ p
+                             . map (printf "%.4f") . r2list . phsPositions $ p
                           , printf "d<%s>/dt: <%s>" qVec . intercalate ", "
                              . map (printf "%.4f") . r2list . velocities seSystem $ p
                           , printf "KE: %.4f" . keP seSystem           $ p
-                          , printf "PE: %.4f" . pe seSystem . phsPos   $ p
+                          , printf "PE: %.4f" . pe seSystem . phsPositions $ p
                           , printf "H : %.4f" . hamiltonian seSystem   $ p
                           , " "
                           , printf "rate: x%.2f <>" $ soRate
                           , printf "hist: % 5d []" $ soHist
                           , printf "zoom: x%.2f -+" $ soZoom
                           ]
-              pts  = (`zip` ptAttrs) . seDraw . underlyingPos seSystem . phsPos
+              pts  = (`zip` ptAttrs) . seDraw . underlyingPos seSystem . phsPositions
                    $ p
               hists' = foldl' (\h (r, a) -> M.insertWith (addHist soHist) a [r] h) hists pts
           dr <- displayBounds $ outputIface vty
