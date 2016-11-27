@@ -2,9 +2,9 @@
 -- See Hoogle, http://www.haskell.org/hoogle/
 
 
--- | Physics on generalized coordinate systems using Hamiltonian Mechanics
+-- | Physics on generalized coordinate systems using Hamiltonian Mechanics and AD
 --   
---   Please see README.md (or read online at
+--   See README.md (or read online at
 --   <a>https://github.com/mstksg/hamilton#readme</a>)
 @package hamilton
 @version 0.1.0.0
@@ -151,6 +151,13 @@ evolveHam :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s) => Syste
 --   <a>Vector</a>. The output list should be the same length as the input
 --   list.
 evolveHam' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Phase n -> [Double] -> [Phase n]
+
+-- | Step a system through configuration space over over a single timestep.
+--   
+--   Note that the simulation itself still runs in phase space; this
+--   function just abstracts over converting to and from phase space for
+--   the input and output.
+stepHamC :: forall m n. (KnownNat m, KnownNat n) => Double -> System m n -> Config n -> Config n
 
 -- | A convenience wrapper for <a>evolveHam</a> that works on configuration
 --   space states instead of phase space states.
