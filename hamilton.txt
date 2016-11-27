@@ -9,6 +9,15 @@
 @package hamilton
 @version 0.1.0.0
 
+
+-- | differentiation Copyright : (c) Justin Le 2016 License : BSD-3
+--   Maintainer : justin@jle.im Stability : unstable Portability : portable
+--   
+--   Simulate physics systems using Hamiltonian mechanics and automatic
+--   differentiation!
+--   
+--   See the <a>https://github.com/mstksg/hamilton#readme</a> for more
+--   information on usage!
 module Numeric.Hamilton
 
 -- | Represents a physical system in which physics happens. A
