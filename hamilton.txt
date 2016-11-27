@@ -69,7 +69,7 @@ underlyingPos :: System m n -> R n -> R m
 --   configuration space and then convert it to phase space before handing
 --   it off to the hamiltonian machinery.
 data Config :: Nat -> Type
-[Cfg] :: {cfgPos :: !(R n)  The current values ("positions") of each of the @n@ generalized coordinates, cfgVel :: !(R n)  The current rate of changes ("velocities") of each of the @n@ generalized coordinates} -> Config n
+[Cfg] :: {cfgPositions :: !(R n)  The current values ("positions") of each of the @n@ generalized coordinates, cfgVelocities :: !(R n)  The current rate of changes ("velocities") of each of the @n@ generalized coordinates} -> Config n
 
 -- | Represents the full state of a system of <tt>n</tt> generalized
 --   coordinates in phase space (informally, "positions and momentums").
@@ -88,7 +88,7 @@ data Config :: Nat -> Type
 --   state in configuration space using <a>Config</a>, and then convert it
 --   to a <a>Phase</a> with <a>toPhase</a>.
 data Phase :: Nat -> Type
-[Phs] :: {phsPos :: !(R n)  The current values ("positions") of each of the @n@ generalized coordinates., phsMom :: !(R n)  The current conjugate momenta ("momentums") to each of the @n@ generalized coordinates} -> Phase n
+[Phs] :: {phsPositions :: !(R n)  The current values ("positions") of each of the @n@ generalized coordinates., phsMomenta :: !(R n)  The current conjugate momenta ("momentums") to each of the @n@ generalized coordinates} -> Phase n
 
 -- | Convert a configuration-space representaiton of the state of the
 --   system to a phase-space representation.
@@ -111,10 +111,16 @@ fromPhase :: (KnownNat m, KnownNat n) => System m n -> Phase n -> Config n
 -- | Compute the generalized momenta conjugate to each generalized
 --   coordinate of a system by giving the configuration-space state of the
 --   system.
+--   
+--   Note that getting the momenta from a <tt><a>Phase</a> n</tt> involves
+--   just using <a>phsMomenta</a>.
 momenta :: (KnownNat m, KnownNat n) => System m n -> Config n -> R n
 
 -- | Compute the rate of change of each generalized coordinate by giving
 --   the state of the system in phase space.
+--   
+--   Note that getting the velocities from a <tt><a>Config</a> n</tt>
+--   involves just using <a>cfgVelocities</a>.
 velocities :: (KnownNat m, KnownNat n) => System m n -> Phase n -> R n
 
 -- | The kinetic energy of a system, given the system's state in
