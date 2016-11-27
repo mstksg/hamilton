@@ -97,6 +97,18 @@ doublePendulum = mkSystem' masses coordinates potential
         => V.Vector 4 a
         -> a
     potential (V4 _ y1 _ y2) = (y1 + 2 * y2) * 5
+
+
+-- some helper patterns to pattern match on sized vectors
+pattern V2 :: a -> a -> V2 a
+pattern V2 x y <- (V.toList->[x,y])
+  where
+    V2 x y = fromJust (V.fromList [x,y])
+
+pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
+pattern V4 x y z a <- (V.toList->[x,y,z,a])
+  where
+    V4 x y z a = fromJust (V.fromList [x,y,z,a])
 ~~~
 
 Neat!  Easy, right?
@@ -214,16 +226,27 @@ More examples
 
 And...that's all you need!
 
-Here is the actual code for the two-body system:
+Here is the actual code for the two-body system, assuming `m1` is `100` and
+`m2` is `1`:
 
 ~~~haskell
 twoBody :: System 4 2
-twoBody =
-    mkSystem (vec4 m1 m1 m2 m2)             -- masses
-             (\(V2 r θ) -> let r1 =   r * m2 / (m1 + m2)
-                               r2 = - r * m1 / (m1 + m2)
-                           in  V4 (r1 * cos θ) (r1 * sin θ)
-                                  (r2 * cos θ) (r2 * sin θ)
-             )                              -- coordinates
-             (\(V2 r _) -> - m1 * m2 / r)   -- potential
+twoBody = mkSystem' masses coordinates potential
+  where
+    masses :: R 4
+    masses = vec4 100 100 1 1
+    coordinates
+        :: Floating a
+        => V.Vector 2 a
+        -> V.Vector 4 a
+    coordinates (V2 r θ) = V4 (r1 * cos θ) (r1 * sin θ)
+                              (r2 * cos θ) (r2 * sin θ)
+      where
+        r1 =   r *   1 / 101
+        r2 = - r * 100 / 101
+    potential
+        :: Num a
+        => V.Vector 4 a
+        -> a
+    potential (V2 r _) = - 100 / r
 ~~~
