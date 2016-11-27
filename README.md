@@ -64,10 +64,11 @@ manipulation.
 
 [WRH]: https://www.youtube.com/watch?v=SZXHoWwBcDc
 
-See [documentation][] and [example runner][].
+See [documentation][] and [example runner][] (and its [user guide][])
 
 [documentation]: https://mstksg.github.io/hamilton/
 [example runner]: https://github.com/mstksg/hamilton/blob/master/app/Examples.hs
+[user guide]: https://github.com/mstksg/hamilton#example-app-runner
 
 ### Full Exmaple
 
@@ -155,7 +156,7 @@ positions = phsPos <$> evolution
 
 And the position in the underlying cartesian space as:
 
-~~~hakell
+~~~haskell
 positions' :: [R 4]
 positions' = underlyingPos doublePendulum <$> positions
 ~~~
