@@ -10,10 +10,7 @@
 @version 0.1.0.0
 
 
--- | differentiation Copyright : (c) Justin Le 2016 License : BSD-3
---   Maintainer : justin@jle.im Stability : unstable Portability : portable
---   
---   Simulate physics systems using Hamiltonian mechanics and automatic
+-- | Simulate physics systems using Hamiltonian mechanics and automatic
 --   differentiation!
 --   
 --   See the <a>https://github.com/mstksg/hamilton#readme</a> for more
