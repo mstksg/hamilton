@@ -32,6 +32,7 @@ executable hamilton-examples
   main-is:             Examples.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
+                     , ansi-wl-pprint
                      , containers
                      , hamilton
                      , hmatrix

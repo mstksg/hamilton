@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE PatternSynonyms      #-}
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
@@ -15,6 +16,16 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns         #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
+-- | Hamilton example suite
+--
+-- See: https://github.com/mstksg/hamilton#example-app-runner
+--
+-- Or just run with:
+--
+-- > $ hamtilton-examples --help
+-- > $ hamtilton-examples [EXAMPLE] --help
+--
 
 import           Control.Concurrent
 import           Control.Monad
@@ -39,6 +50,7 @@ import qualified Data.Vector                         as VV
 import qualified Data.Vector.Generic.Sized           as VG
 import qualified Data.Vector.Sized                   as V
 import qualified Data.Vector.Storable                as VS
+import qualified Text.PrettyPrint.ANSI.Leijen        as PP
 
 data SysExample where
     SE :: (KnownNat m, KnownNat n)
@@ -299,10 +311,7 @@ main = do
     EO{..} <- execParser $ info (helper <*> parseEO)
         ( fullDesc
        <> header "hamilton-examples - hamilton library example suite"
-       <> progDesc ( "Run examples from the hamilton library example suite.  "
-                  <> "Use with [EXAMPLE] --help for more per-example options.  "
-                  <> "To adjust rate/history/zoom, use keys <>/[]/-+, respectively."
-                   )
+       <> progDescDoc (Just descr)
         )
 
     vty <- mkVty =<< standardIOConfig
@@ -378,6 +387,15 @@ main = do
           threadDelay (round (1000000 / fps))
           go hists' p'
     addHist hl new old = take hl (new ++ old)
+    descr :: PP.Doc
+    descr = PP.vcat
+      [ "Run examples from the hamilton library example suite."
+      , "Use with [EXAMPLE] --help for more per-example options."
+      , ""
+      , "To adjust rate/history/zoom, use keys <>/[]/-+, respectively."
+      , ""
+      , "See: https://github.com/mstksg/hamilton#example-app-runner"
+      ]
 
 processEvt
     :: Event -> Maybe SimEvt
