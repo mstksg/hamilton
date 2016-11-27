@@ -1,6 +1,8 @@
 Hamilton
 ========
 
+[![Build Status](https://travis-ci.org/mstksg/hamilton.svg?branch=master)](https://travis-ci.org/mstksg/hamilton)
+
 Simulate physics on arbitrary coordinate systems using [automatic
 differentiation][ad] and [Hamiltonian mechanics][].
 
