@@ -67,8 +67,87 @@ See [documentation][] and [example runner][].
 [documentation]: https://mstksg.github.io/hamilton/
 [example runner]: https://github.com/mstksg/hamilton/blob/master/app/Examples.hs
 
-Example runner
---------------
+### Full Exmaple
+
+Let's turn our double pendulum (with the second pendulum half as long) into an
+actual running program.  Let's say that `g = 5`, `m1 = 1`, and `m2 = 2`.
+
+First, the system:
+
+~~~haskell
+import           Numeric.LinearAlgebra.Static
+import qualified Data.Vector.Sized as V
+
+
+doublePendulum :: System 4 2
+doublePendulum = mkSystem' masses coordinates potential
+  where
+    masses :: R 4
+    masses = vec4 1 1 2 2
+    coordinates
+        :: Floating a
+        => V.Vector 2 a
+        -> V.Vector 4 a
+    coordinates (V2 θ1 θ2) = V4 (sin θ1)            (-cos θ1)
+                                (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
+    potential
+        :: Num a
+        => V.Vector 4 a
+        -> a
+    potential (V4 _ y1 _ y2) = (y1 + 2 * y2) * 5
+~~~
+
+Neat!  Easy, right?
+
+Okay, now let's run it.  Let's pick a starting configuration (state of the
+system) of `θ1` and `θ2`:
+
+~~~haskell
+config0 :: Config 2
+config0 = Cfg (vec2 1 0  )  -- initial positions
+              (vec2 0 0.5)  -- initial velocities
+~~~
+
+Configurations are nice, but Hamiltonian dynamics is all about motion through
+phase space, so let's convert this configuration-space representation of the
+state into a phase-space representation of the state:
+
+~~~haskell
+phase0 :: Phase 2
+phase0 = toPhase doublePendulum config0
+~~~
+
+And now we can ask for the state of our system at any amount of points in time!
+
+~~~haskell
+ghci> evolveHam doublePendulum phase0 [0,0.1 .. 1]
+-- result: state of the system at times 0, 0.1, 0.2, 0.3 ... etc.
+~~~
+
+Or, if you want to run the system step-by-step:
+
+
+~~~haskell
+evolution :: [Phase 2]
+evolution = iterate (stepHam 0.1 doublePendulum) phase0
+~~~
+
+And you can get the position of the coordinates as:
+
+~~~haskell
+positions :: [R 2]
+positions = phsPos <$> evolution
+~~~
+
+And the position in the underlying cartesian space as:
+
+~~~hakell
+positions' :: [R 4]
+positions' = underlyingPos doublePendulum <$> positions
+~~~
+
+Example App runner
+------------------
 
 Installation:
 

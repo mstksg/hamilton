@@ -1,7 +1,7 @@
 name:                hamilton
 version:             0.1.0.0
-synopsis:            Physics on generalized coordinate systems using Hamiltonian Mechanics
-description:         Please see README.md (or read online at <https://github.com/mstksg/hamilton#readme>)
+synopsis:            Physics on generalized coordinate systems using Hamiltonian Mechanics and AD
+description:         See README.md (or read online at <https://github.com/mstksg/hamilton#readme>)
 homepage:            https://github.com/mstksg/hamilton
 license:             BSD3
 license-file:        LICENSE

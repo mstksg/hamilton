@@ -34,9 +34,12 @@ module Numeric.Hamilton
   , hamiltonian
   , hamEqs
     -- * Simulating hamiltonian dynamics
+    -- ** Over phase space
   , stepHam
   , evolveHam
   , evolveHam'
+    -- ** Over configuration space
+  , stepHamC
   , evolveHamC
   , evolveHamC'
   ) where
@@ -459,3 +462,17 @@ evolveHamC
     -> V.Vector s Double    -- ^ desired solution times
     -> V.Vector s (Config n)
 evolveHamC s c0 = fmap (fromPhase s) . evolveHam s (toPhase s c0)
+
+-- | Step a system through configuration space over over a single timestep.
+--
+-- Note that the simulation itself still runs in phase space; this function
+-- just abstracts over converting to and from phase space for the input
+-- and output.
+stepHamC
+    :: forall m n. (KnownNat m, KnownNat n)
+    => Double           -- ^ timestep to step through
+    -> System m n       -- ^ system to simulate
+    -> Config n         -- ^ initial state, in phase space
+    -> Config n
+stepHamC r s = fromPhase s . stepHam r s . toPhase s
+

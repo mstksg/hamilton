@@ -54,9 +54,9 @@ pendulum :: Double -> Double -> SysExample
 pendulum θ0 ω0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
   where
     s :: System 2 1
-    s = mkSystem' (vec2 1 1                        )     -- masses
-                  (\(V1 θ)   -> V2 (sin θ) (-cos θ))     -- coordinates
-                  (\(V2 _ y) -> y                  )     -- potential
+    s = mkSystem' (vec2 1 1                             )     -- masses
+                  (\(V1 θ)   -> V2 (sin θ) (0.5 - cos θ))     -- coordinates
+                  (\(V2 _ y) -> y                       )     -- potential
     f :: R 2 -> [V2 Double]
     f xs = [r2vec xs]
     c0 :: Config 1
@@ -67,8 +67,8 @@ doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
   where
     s :: System 4 2
     s = mkSystem' (vec4 m1 m1 m2 m2)     -- masses
-                  (\(V2 θ1 θ2)     -> V4 (sin θ1)            (-cos θ1)
-                                         (sin θ1 + sin θ2/2) (-cos θ1 - cos θ2/2)
+                  (\(V2 θ1 θ2)     -> V4 (sin θ1)            (1 - cos θ1)
+                                         (sin θ1 + sin θ2/2) (1 - cos θ1 - cos θ2/2)
                   )                      -- coordinates
                   (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
                                          -- potential
@@ -385,10 +385,10 @@ processEvt = \case
     EvKey KEsc        []      -> Just SEQuit
     EvKey (KChar 'c') [MCtrl] -> Just SEQuit
     EvKey (KChar 'q') []      -> Just SEQuit
-    EvKey (KChar '+') []      -> Just $ SEZoom 2
-    EvKey (KChar '-') []      -> Just $ SEZoom 0.5
-    EvKey (KChar '>') []      -> Just $ SERate 1.5
-    EvKey (KChar '<') []      -> Just $ SERate (1/1.5)
+    EvKey (KChar '+') []      -> Just $ SEZoom (sqrt 2)
+    EvKey (KChar '-') []      -> Just $ SEZoom (sqrt 0.5)
+    EvKey (KChar '>') []      -> Just $ SERate (sqrt 2)
+    EvKey (KChar '<') []      -> Just $ SERate (sqrt (1/2))
     EvKey (KChar ']') []      -> Just $ SEHist 5
     EvKey (KChar '[') []      -> Just $ SEHist (-5)
     _                         -> Nothing
