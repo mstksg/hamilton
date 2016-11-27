@@ -12,6 +12,23 @@
 {-# LANGUAGE TypeOperators       #-}
 {-# LANGUAGE ViewPatterns        #-}
 
+-- |
+-- Module      : Numeric.Hamilton
+-- Description : Hamiltonian dynamics for physical systems on generalized
+--               coordinates using automatic differentiation
+-- Copyright   : (c) Justin Le 2016
+-- License     : BSD-3
+-- Maintainer  : justin@jle.im
+-- Stability   : unstable
+-- Portability : portable
+--
+-- Simulate physical systems on generalized/arbitrary coordinates using
+-- Hamiltonian mechanics and automatic differentiation!
+--
+-- See the <https://github.com/mstksg/hamilton#readme> for more
+-- information on usage!
+--
+
 module Numeric.Hamilton
   ( -- * Systems and states
     -- ** Systems
@@ -39,6 +56,9 @@ module Numeric.Hamilton
   , evolveHam
   , evolveHam'
     -- ** Over configuration space
+    -- | Convenience wrappers over the normal phase-space
+    -- steppers/simulators that allow you to provide input and expect
+    -- output in configuration space instead of in phase space.
   , stepHamC
   , evolveHamC
   , evolveHamC'
