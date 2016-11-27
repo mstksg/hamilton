@@ -10,8 +10,8 @@
 @version 0.1.0.0
 
 
--- | Simulate physics systems using Hamiltonian mechanics and automatic
---   differentiation!
+-- | Simulate physical systems on generalized/arbitrary coordinates using
+--   Hamiltonian mechanics and automatic differentiation!
 --   
 --   See the <a>https://github.com/mstksg/hamilton#readme</a> for more
 --   information on usage!
