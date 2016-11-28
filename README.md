@@ -251,3 +251,36 @@ twoBody = mkSystem' masses coordinates potential
         -> a
     potential (V2 r _) = - 100 / r
 ~~~
+
+Potential improvements
+----------------------
+
+*   **Time-dependent systems**:  Shouldn't be an problem in theory/math; just
+    add a time parameter before all of the functions.  This opens a lot of
+    doors, like deriving inertial forces for free (like the famous Coriolis
+    force and centrifugal force).
+
+    The only thing is that it makes the API pretty inconvenient, because it'd
+    require all of the functions to also take a time parameter.  Of course, the
+    easy way out/ugly solution would be to just offer two versions of the same
+    function (one for time-independent systems and one for time-dependent
+    systems.  But this is un-ideal.
+
+*   Velocity-dependent potentials:  Would give us the ability to model
+    dissipative systems, like systems with friction (dependent on `signum v`)
+    and linear & quadratic wind resistance.
+
+    This issue is much harder, theoretically.  It involves inverting arbitrary
+    functions `forall a. RealFloat a => V.Vector n a -> V.Vector m a`.  It
+    might be possible with the help of some
+    [bidirectionalization techniques][bff-pearl], but I can't get the [bff][]
+    package to compile, and I'm not sure how to get [bff-mono][] to work with
+    numeric functions.
+
+    If anyone is familiar with bidirectionalization techniques and is willing
+    to help out, please send me a message or open an issue! :)
+
+[bff-pearl]: https://pdfs.semanticscholar.org/5f0d/ef02dbd96e102be9104d2ceb728d2a2a5beb.pdf
+[bff]: http://hackage.haskell.org/package/bff
+[bff-mono]: http://hackage.haskell.org/package/bff-mono
+
