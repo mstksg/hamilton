@@ -101,7 +101,7 @@ doublePendulum = mkSystem' masses coordinates potential
 
 
 -- some helper patterns to pattern match on sized vectors
-pattern V2 :: a -> a -> V2 a
+pattern V2 :: a -> a -> V.Vector 2 a
 pattern V2 x y <- (V.toList->[x,y])
   where
     V2 x y = fromJust (V.fromList [x,y])
@@ -151,7 +151,7 @@ And you can get the position of the coordinates as:
 
 ~~~haskell
 positions :: [R 2]
-positions = phsPos <$> evolution
+positions = phsPositions <$> evolution
 ~~~
 
 And the position in the underlying cartesian space as:
@@ -232,7 +232,7 @@ Here is the actual code for the two-body system, assuming `m1` is `100` and
 
 ~~~haskell
 twoBody :: System 4 2
-twoBody = mkSystem' masses coordinates potential
+twoBody = mkSystem masses coordinates potential
   where
     masses :: R 4
     masses = vec4 100 100 1 1
