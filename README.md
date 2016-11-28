@@ -4,7 +4,8 @@ Hamilton
 [![Build Status](https://travis-ci.org/mstksg/hamilton.svg?branch=master)](https://travis-ci.org/mstksg/hamilton)
 
 Simulate physics on arbitrary coordinate systems using [automatic
-differentiation][ad] and [Hamiltonian mechanics][].
+differentiation][ad] and [Hamiltonian mechanics][].  State only an arbitrary
+parameterization of your system and a potential energy function!
 
 [ad]: http://hackage.haskell.org/package/ad
 [Hamiltonian mechanics]: https://en.wikipedia.org/wiki/Hamiltonian_mechanics
@@ -64,9 +65,11 @@ manipulation.
 
 [WRH]: https://www.youtube.com/watch?v=SZXHoWwBcDc
 
-See [documentation][] and [example runner][] (and its [user guide][])
+See a [blog post][] I wrote on this, and also the [hackage documentation][] and the
+[example runner user guide][] (and its [source][example runner]).
 
-[documentation]: https://mstksg.github.io/hamilton/
+[blog post]: https://blog.jle.im/entry/introducing-the-hamilton-library.html
+[documentation]: http://hackage.haskell.org/package/hamilton
 [example runner]: https://github.com/mstksg/hamilton/blob/master/app/Examples.hs
 [user guide]: https://github.com/mstksg/hamilton#example-app-runner
 
@@ -163,6 +166,8 @@ positions' = underlyingPos doublePendulum <$> positions
 
 Example App runner
 ------------------
+
+*([Source][example runner])*
 
 Installation:
 
