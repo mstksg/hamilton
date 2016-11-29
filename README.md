@@ -271,9 +271,10 @@ Potential improvements
     function (one for time-independent systems and one for time-dependent
     systems.  But this is un-ideal.
 
-*   Velocity-dependent potentials:  Would give us the ability to model
-    dissipative systems, like systems with friction (dependent on `signum v`)
-    and linear & quadratic wind resistance.
+*   Velocity-dependent potentials:  Would give us the ability to model systems
+    with velocity-dependent Lagrangians like a charged particle in an
+    electromagnetic field, and also dissipative systems, like systems with
+    friction (dependent on `signum v`) and linear & quadratic wind resistance.
 
     This issue is much harder, theoretically.  It involves inverting arbitrary
     functions `forall a. RealFloat a => V.Vector n a -> V.Vector m a`.  It
