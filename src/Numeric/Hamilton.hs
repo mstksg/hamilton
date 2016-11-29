@@ -1,5 +1,8 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveFoldable      #-}
+{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE DeriveTraversable   #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -69,6 +72,7 @@ module Numeric.Hamilton
 import           Control.Monad
 import           Data.Bifunctor
 import           Data.Foldable
+import           Data.Functor.Compose
 import           Data.Kind
 import           Data.Maybe
 import           Data.Proxy
@@ -83,6 +87,7 @@ import qualified Control.Comonad              as C
 import qualified Control.Comonad.Cofree       as C
 import qualified Data.Vector.Generic.Sized    as VG
 import qualified Data.Vector.Sized            as V
+import qualified Data.Vector.Storable         as VS
 import qualified Numeric.LinearAlgebra        as LA
 
 -- | Represents the full state of a system of @n@ generalized coordinates
@@ -99,9 +104,11 @@ import qualified Numeric.LinearAlgebra        as LA
 -- convert it to phase space before handing it off to the hamiltonian
 -- machinery.
 data Config :: Nat -> Type where
-    Cfg :: { -- | The current values ("positions") of each of the @n@
+    Cfg :: { -- | The current time of the state of the system
+             cfgTime       :: !Double
+           , -- | The current values ("positions") of each of the @n@
              -- generalized coordinates
-             cfgPositions :: !(R n)
+             cfgPositions  :: !(R n)
              -- | The current rate of changes ("velocities") of each of the
              -- @n@ generalized coordinates
            , cfgVelocities :: !(R n)
@@ -128,12 +135,14 @@ deriving instance KnownNat n => Show (Config n)
 -- in configuration space using 'Config', and then convert it to a 'Phase'
 -- with 'toPhase'.
 data Phase :: Nat -> Type where
-    Phs :: { -- | The current values ("positions") of each of the @n@
+    Phs :: { -- | The current time of the state of the system
+             phsTime      :: !Double
+             -- | The current values ("positions") of each of the @n@
              -- generalized coordinates.
-             phsPositions :: !(R n)
+           , phsPositions :: !(R n)
              -- | The current conjugate momenta ("momentums") to each of
              -- the @n@ generalized coordinates
-           , phsMomenta :: !(R n)
+           , phsMomenta   :: !(R n)
            }
         -> Phase n
   deriving (Generic)
@@ -155,11 +164,11 @@ deriving instance KnownNat n => Show (Phase n)
 -- describes the system in phase space).
 data System :: Nat -> Nat -> Type where
     Sys :: { _sysInertia        :: R m
-           , _sysCoords         :: R n -> R m
-           , _sysJacobian       :: R n -> L m n
-           , _sysJacobian2      :: R n -> V.Vector m (Sym n)
-           , _sysPotential      :: R n -> Double
-           , _sysPotentialGrad  :: R n -> R n
+           , _sysCoords         :: Double -> R n -> R m
+           , _sysJacobian       :: Double -> R n -> (R m, L m n)
+           , _sysJacobian2      :: Double -> R n -> V.Vector m (Double, R n, Sym n)
+           , _sysPotential      :: Double -> R n -> Double
+           , _sysPotentialGrad  :: Double -> R n -> (Double, R n)
            }
         -> System m n
 
@@ -181,6 +190,7 @@ data System :: Nat -> Nat -> Type where
 -- Useful for plotting/drawing the system in cartesian space.
 underlyingPos
     :: System m n
+    -> Double
     -> R n
     -> R m
 underlyingPos = _sysCoords
@@ -188,6 +198,7 @@ underlyingPos = _sysCoords
 -- | The potential energy of a system, given the position in the
 -- generalized coordinates of the system.
 pe  :: System m n
+    -> Double
     -> R n
     -> Double
 pe = _sysPotential
@@ -212,6 +223,22 @@ vec2l = fromJust . (\rs -> withRows rs exactDims) . toList . fmap vec2r
 --     -> V.Vector m (V.Vector n Double)
 -- l2vec = fromJust . V.fromList . map r2vec . toRows
 
+data Chron f a = Chron { chronTime :: !a
+                       , chronVal  :: !(f a)
+                       }
+    deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+
+hoistChron
+    :: (f a -> g a)
+    -> Chron f a
+    -> Chron g a
+hoistChron f (Chron x fx) = Chron x (f fx)
+
+unChron
+    :: Chron f a
+    -> (a, f a)
+unChron Chron{..} = (chronTime, chronVal)
+
 -- | Create a system with @n@ generalized coordinates by describing its
 -- coordinate space (by a function from the generalized coordinates to the
 -- underlying cartesian coordinates), the inertia of each of those
@@ -225,29 +252,46 @@ mkSystem
                 -- in the underlying cartesian space of the system.  This
                 -- should be mass for linear coordinates and rotational
                 -- inertia for angular coordinates.
-    -> (forall a. RealFloat a => V.Vector n a -> V.Vector m a)
+    -> (forall a. RealFloat a => a -> V.Vector n a -> V.Vector m a)
                 -- ^ Conversion function to convert points in the
                 -- generalized coordinate space to the underlying cartesian
                 -- space of the system.
-    -> (forall a. RealFloat a => V.Vector n a -> a)
+    -> (forall a. RealFloat a => a -> V.Vector n a -> a)
                 -- ^ The potential energy of the system as a function of
                 -- the generalized coordinate space's positions.
     -> System m n
 mkSystem m f u =
     Sys m
-        (vec2r . f . r2vec)
-        (tr . vec2l . jacobianT f . r2vec)
-        (fmap (sym . vec2l . j2 . C.hoistCofree VG.convert)
-           . VG.convert
-           . jacobians f
-           . r2vec
-           )
-        (u . r2vec)
-        (vec2r . grad u . r2vec)
+        (\t -> vec2r . f t . r2vec)
+        (\t x -> let jt :: V.Vector m Double
+                     jx :: V.Vector n (V.Vector m Double)
+                     Chron jt jx = jacobianT f' (Chron t (r2vec x))
+                 in  (vec2r jt, tr (vec2l jx))
+        )
+        (\t x -> fmap ( (\(t2, jt, jx) -> (t2, vec2r jt, sym (vec2l jx)))
+                      . j2
+                      . C.hoistCofree (hoistChron VG.convert)
+                      )
+               . VG.convert
+               $ jacobians f' (Chron t (r2vec x))
+        )
+        (\t -> u t . r2vec)
+        (\t -> second vec2r . unChron . grad u' . Chron t . r2vec)
   where
-    j2  :: C.Cofree (V.Vector n) Double
-        -> V.Vector n (V.Vector n Double)
-    j2 = fmap (fmap C.extract . C.unwrap) . C.unwrap
+    f'  :: RealFloat a => Chron (V.Vector n) a -> V.Vector m a
+    f' (Chron t x) = f t x
+    u'  :: RealFloat a => Chron (V.Vector n) a -> a
+    u' (Chron t x) = u t x
+    j2  :: C.Cofree (Chron (V.Vector n)) Double
+        -> (Double, V.Vector n Double, V.Vector n (V.Vector n Double))
+    j2 c = (t2, jt, chronVal <$> jx)
+      where
+        t2 :: Double
+        jt :: V.Vector n Double
+        jx :: V.Vector n (Chron (V.Vector n) Double)
+        Chron (Chron t2 jt) jx = fmap (fmap C.extract . C.unwrap)
+                               . C.unwrap
+                               $ c
 
 -- | Convenience wrapper over 'mkSystem' that allows you to specify the
 -- potential energy function in terms of the underlying cartesian
@@ -258,15 +302,15 @@ mkSystem'
                 -- in the underlying cartesian space of the system.  This
                 -- should be mass for linear coordinates and rotational
                 -- inertia for angular coordinates.
-    -> (forall a. RealFloat a => V.Vector n a -> V.Vector m a)
+    -> (forall a. RealFloat a => a -> V.Vector n a -> V.Vector m a)
                 -- ^ Conversion function to convert points in the
                 -- generalized coordinate space to the underlying cartesian
                 -- space of the system.
-    -> (forall a. RealFloat a => V.Vector m a -> a)
+    -> (forall a. RealFloat a => a -> V.Vector m a -> a)
                 -- ^ The potential energy of the system as a function of
                 -- the underlying cartesian coordinate space's positions.
     -> System m n
-mkSystem' m f u = mkSystem m f (u . f)
+mkSystem' m f u = mkSystem m f (\t -> u t . f t)
 
 
 -- | Compute the generalized momenta conjugate to each generalized
@@ -280,9 +324,15 @@ momenta
     => System m n
     -> Config n
     -> R n
-momenta Sys{..} Cfg{..} = tr j #> diag _sysInertia #> j #> cfgVelocities
+momenta Sys{..} Cfg{..} = tr jx #> diag _sysInertia #> jx #> cfgVelocities
   where
-    j = _sysJacobian cfgPositions
+    (jt, jx) = _sysJacobian cfgTime cfgPositions
+
+-- quadMat
+--     :: (R m, L m n)
+--     -> L m m
+--     -> (Double, R n, L n n)
+-- quadMat (x, xs) m = (, tr xs <> m <> xs)
 
 -- | Convert a configuration-space representaiton of the state of the
 -- system to a phase-space representation.
@@ -297,7 +347,7 @@ toPhase
     => System m n
     -> Config n
     -> Phase n
-toPhase s = Phs <$> cfgPositions <*> momenta s
+toPhase s = Phs <$> cfgTime <*> cfgPositions <*> momenta s
 
 -- | The kinetic energy of a system, given the system's state in
 -- configuration space.
@@ -320,7 +370,7 @@ lagrangian
     -> Double
 lagrangian s = do
     t <- keC s
-    u <- pe s . cfgPositions
+    u <- pe s <$> cfgTime <*> cfgPositions
     return (t - u)
 
 -- | Compute the rate of change of each generalized coordinate by giving
@@ -335,7 +385,7 @@ velocities
     -> R n
 velocities Sys{..} Phs{..} = inv jmj #> phsMomenta
   where
-    j   = _sysJacobian phsPositions
+    j   = _sysJacobian phsTime phsPositions
     jmj = tr j <> diag _sysInertia <> j
 
 -- | Invert 'toPhase' and convert a description of a system's state in
@@ -349,7 +399,7 @@ fromPhase
     => System m n
     -> Phase n
     -> Config n
-fromPhase s = Cfg <$> phsPositions <*> velocities s
+fromPhase s = Cfg <$> phsTime <*> phsPositions <*> velocities s
 
 -- | The kinetic energy of a system, given the system's state in
 -- phase space.
@@ -371,7 +421,7 @@ hamiltonian
     -> Double
 hamiltonian s = do
     t <- keP s
-    u <- pe s . phsPositions
+    u <- pe s <$> phsTime <*> phsPositions
     return (t + u)
 
 -- | The "hamiltonian equations" for a given system at a given state in
@@ -386,16 +436,16 @@ hamEqs
 hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
   where
     mm   = diag _sysInertia
-    j    = _sysJacobian phsPositions
+    j    = _sysJacobian phsTime phsPositions
     trj  = tr j
-    j'   = unSym <$> _sysJacobian2 phsPositions
+    j'   = unSym <$> _sysJacobian2 phsTime phsPositions
     jmj  = trj <> mm <> j
     ijmj = inv jmj
     dTdq = vec2r
          . flip fmap (tr2 j') $ \djdq ->
              -phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta
     dHdp = ijmj #> phsMomenta
-    dHdq = dTdq + _sysPotentialGrad phsPositions
+    dHdq = dTdq + _sysPotentialGrad phsTime phsPositions
 
 tr2
     :: (KnownNat m, KnownNat n, KnownNat o)
@@ -459,9 +509,10 @@ evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
     fromPs :: Phase n -> LA.Vector Double
     fromPs p = LA.vjoin . map extract $ [phsPositions p, phsMomenta p]
     toPs :: LA.Vector Double -> Phase n
-    toPs v = Phs pP pM
+    toPs v = Phs (VS.unsafeHead t) pP pM
       where
-        Just [pP, pM] = traverse create . LA.takesV [n, n] $ v
+        t : vs = LA.takesV [1,n,n] v
+        Just [pP, pM] = traverse create vs
 
 -- | A convenience wrapper for 'evolveHam'' that works on configuration
 -- space states instead of phase space states.
