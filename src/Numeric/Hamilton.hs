@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE DeriveTraversable   #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -76,19 +77,20 @@ import           Data.Functor.Compose
 import           Data.Kind
 import           Data.Maybe
 import           Data.Proxy
-import           Data.Type.Equality hiding    (sym)
-import           GHC.Generics                 (Generic)
+import           Data.Type.Equality hiding           (sym)
+import           GHC.Generics                        (Generic)
 import           GHC.TypeLits
 import           GHC.TypeLits.Compare
+import           GHC.TypeLits.Witnesses
 import           Numeric.AD
 import           Numeric.GSL.ODE
-import           Numeric.LinearAlgebra.Static
-import qualified Control.Comonad              as C
-import qualified Control.Comonad.Cofree       as C
-import qualified Data.Vector.Generic.Sized    as VG
-import qualified Data.Vector.Sized            as V
-import qualified Data.Vector.Storable         as VS
-import qualified Numeric.LinearAlgebra        as LA
+import           Numeric.LinearAlgebra.Static hiding ((&))
+import qualified Control.Comonad                     as C
+import qualified Control.Comonad.Cofree              as C
+import qualified Data.Vector.Generic.Sized           as VG
+import qualified Data.Vector.Sized                   as V
+import qualified Data.Vector.Storable                as VS
+import qualified Numeric.LinearAlgebra               as LA
 
 -- | Represents the full state of a system of @n@ generalized coordinates
 -- in configuration space (informally, "positions and velocities")
@@ -166,11 +168,29 @@ data System :: Nat -> Nat -> Type where
     Sys :: { _sysInertia        :: R m
            , _sysCoords         :: Double -> R n -> R m
            , _sysJacobian       :: Double -> R n -> (R m, L m n)
-           , _sysJacobian2      :: Double -> R n -> V.Vector m (Double, R n, Sym n)
+           , _sysJacobian2      :: Double -> R n -> V.Vector m (Sym' n)
            , _sysPotential      :: Double -> R n -> Double
            , _sysPotentialGrad  :: Double -> R n -> (Double, R n)
            }
         -> System m n
+
+-- | Helper data type to describe a symmetric matrix in block form, where
+-- the last row/column and lower corner are stored separately.
+data Sym' n = Sym' { sUpper  :: !(Sym n)
+                   , sCross  :: !(R n)
+                   , sCorner :: !(Double)
+                   }
+
+sysJacobian
+    :: (KnownNat m, KnownNat n, KnownNat (n + 1))
+    => System m n
+    -> Double
+    -> R n
+    -> L m (n + 1)
+sysJacobian Sys{..} t x = jx ||| col jt
+  where
+    (jt, jx) = _sysJacobian t x
+
 
 -- coordShift
 --     :: (KnownNat m, KnownNat n, KnownNat o)
@@ -268,7 +288,7 @@ mkSystem m f u =
                      Chron jt jx = jacobianT f' (Chron t (r2vec x))
                  in  (vec2r jt, tr (vec2l jx))
         )
-        (\t x -> fmap ( (\(t2, jt, jx) -> (t2, vec2r jt, sym (vec2l jx)))
+        (\t x -> fmap ( (\(t2, jt, jx) -> Sym' (sym (vec2l jx)) (vec2r jt) t2)
                       . j2
                       . C.hoistCofree (hoistChron VG.convert)
                       )
@@ -320,19 +340,41 @@ mkSystem' m f u = mkSystem m f (\t -> u t . f t)
 -- Note that getting the momenta from a @'Phase' n@ involves just using
 -- 'phsMomenta'.
 momenta
-    :: (KnownNat m, KnownNat n)
+    :: forall m n. (KnownNat m, KnownNat n)
     => System m n
     -> Config n
     -> R n
-momenta Sys{..} Cfg{..} = tr jx #> diag _sysInertia #> jx #> cfgVelocities
-  where
-    (jt, jx) = _sysJacobian cfgTime cfgPositions
+momenta s Cfg{..} = case jmj s cfgTime cfgPositions of
+    Sym'{..} -> (unSym sUpper #> cfgPositions) + sCross
+        -- withNatOp (%+) (Proxy @n) (Proxy @1) $
+    -- let j = sysJacobian s cfgTime cfgPositions
+    -- in  initR $ tr j #> diag (_sysInertia s) #> j #> (cfgVelocities & 1)
+  -- where
+  --   j = sysJacobian s cfgTime cfgPositions
+  --   -- (jt, jx) = _sysJacobian cfgTime cfgPositions
 
--- quadMat
---     :: (R m, L m n)
---     -> L m m
---     -> (Double, R n, L n n)
--- quadMat (x, xs) m = (, tr xs <> m <> xs)
+
+-- (&) :: R n
+--     -> Double
+--     -> R (n + 1)
+-- xs & x = undefined
+
+-- initR
+--     :: R (n + 1)
+--     -> R n
+-- initR = undefined
+
+jmj
+    :: (KnownNat m, KnownNat n)
+    => System m n
+    -> Double
+    -> R n
+    -> Sym' n
+jmj Sys{..} t x = Sym' (sym $ tr jx <> m <> jx) (tr jx #> mt) (mt <.> mt)
+  where
+    m = diag _sysInertia
+    (jt, jx) = _sysJacobian t x
+    mt = m #> jt
 
 -- | Convert a configuration-space representaiton of the state of the
 -- system to a phase-space representation.
@@ -379,14 +421,17 @@ lagrangian s = do
 -- Note that getting the velocities from a @'Config' n@ involves just using
 -- 'cfgVelocities'.
 velocities
-    :: (KnownNat m, KnownNat n)
+    :: forall m n. (KnownNat m, KnownNat n)
     => System m n
     -> Phase n
     -> R n
-velocities Sys{..} Phs{..} = inv jmj #> phsMomenta
-  where
-    j   = _sysJacobian phsTime phsPositions
-    jmj = tr j <> diag _sysInertia <> j
+velocities s Phs{..} = withNatOp (%+) (Proxy @n) (Proxy @1) $
+    let j   = sysJacobian s phsTime phsPositions
+        jmj = tr j <> diag (_sysInertia s) <> j
+    in  initR $ inv jmj #> (phsMomenta & 1)
+
+    -- let j = sysJacobian s cfgTime cfgPositions
+    -- in  initR $ tr j #> diag (_sysInertia s) #> j #> (cfgVelocities & 1)
 
 -- | Invert 'toPhase' and convert a description of a system's state in
 -- phase space to a description of the system's state in configuration
@@ -436,7 +481,7 @@ hamEqs
 hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
   where
     mm   = diag _sysInertia
-    j    = _sysJacobian phsTime phsPositions
+    j    = sysJacobian s phsTime phsPositions
     trj  = tr j
     j'   = unSym <$> _sysJacobian2 phsTime phsPositions
     jmj  = trj <> mm <> j
