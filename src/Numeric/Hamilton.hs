@@ -448,16 +448,6 @@ velocities
 velocities s Phs{..} = case sysJMJ s phsTime phsPositions of
     Sym'{..} -> inv (unSym sUpper) #> (phsMomenta - sCross)
 
--- momenta s Cfg{..} = case jmj s cfgTime cfgPositions of
---     Sym'{..} -> (unSym sUpper #> cfgPositions) + sCross
--- velocities s Phs{..} = withNatOp (%+) (Proxy @n) (Proxy @1) $
---     let j   = sysJacobian s phsTime phsPositions
---         jmj = tr j <> diag (_sysInertia s) <> j
---     in  initR $ inv jmj #> (phsMomenta & 1)
-
-    -- let j = sysJacobian s cfgTime cfgPositions
-    -- in  initR $ tr j #> diag (_sysInertia s) #> j #> (cfgVelocities & 1)
-
 -- | Invert 'toPhase' and convert a description of a system's state in
 -- phase space to a description of the system's state in configuration
 -- space.
@@ -529,7 +519,7 @@ stepHam
     -> System m n       -- ^ system to simulate
     -> Phase n          -- ^ initial state, in phase space
     -> Phase n
-stepHam r s p = evolveHam @m @n @2 s p (fromJust $ V.fromList [0, r])
+stepHam r s p = evolveHam @m @n @2 s p (fromJust $ V.fromList [phsTime p, phsTime p + r])
                   `V.unsafeIndex` 1
 
 -- | Evolve a system using a hamiltonian stepper, with the given initial

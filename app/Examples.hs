@@ -369,6 +369,7 @@ main = do
                           , printf "KE: %.4f" . keP seSystem           $ p
                           , printf "PE: %.4f" . pe seSystem tm . phsPositions $ p
                           , printf "H : %.4f" . hamiltonian seSystem   $ p
+                          , printf "t : %.4f" tm
                           , " "
                           , printf "rate: x%.2f <>" $ soRate
                           , printf "hist: % 5d []" $ soHist
