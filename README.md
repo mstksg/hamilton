@@ -69,7 +69,7 @@ See a [blog post][] I wrote on this, and also the [hackage documentation][] and 
 [example runner user guide][] (and its [source][example runner]).
 
 [blog post]: https://blog.jle.im/entry/introducing-the-hamilton-library.html
-[documentation]: http://hackage.haskell.org/package/hamilton
+[hackage documentation]: http://hackage.haskell.org/package/hamilton
 [example runner]: https://github.com/mstksg/hamilton/blob/master/app/Examples.hs
 [user guide]: https://github.com/mstksg/hamilton#example-app-runner
 
