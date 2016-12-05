@@ -73,7 +73,7 @@ module Numeric.Hamilton
 import           Control.Monad
 import           Data.Bifunctor
 import           Data.Foldable
-import           Data.Functor.Compose
+-- import           Data.Functor.Compose
 import           Data.Kind
 import           Data.Maybe
 import           Data.Proxy
@@ -81,7 +81,7 @@ import           Data.Type.Equality hiding           (sym)
 import           GHC.Generics                        (Generic)
 import           GHC.TypeLits
 import           GHC.TypeLits.Compare
-import           GHC.TypeLits.Witnesses
+-- import           GHC.TypeLits.Witnesses
 import           Numeric.AD
 import           Numeric.GSL.ODE
 import           Numeric.LinearAlgebra.Static hiding ((&))
@@ -89,7 +89,7 @@ import qualified Control.Comonad                     as C
 import qualified Control.Comonad.Cofree              as C
 import qualified Data.Vector.Generic.Sized           as VG
 import qualified Data.Vector.Sized                   as V
-import qualified Data.Vector.Storable                as VS
+-- import qualified Data.Vector.Storable                as VS
 import qualified Numeric.LinearAlgebra               as LA
 
 -- | Represents the full state of a system of @n@ generalized coordinates
@@ -373,11 +373,11 @@ sysJMJ'
     -> R n
     -> V.Vector n (Sym n, R n, Double)
 sysJMJ' Sys{..} t x = flip fmap (chronVal (trJ jj)) $ \(jjx, jjt) ->
-    let upper  = 2 * tr jjx <> m <> jjx
+    let upper'  = 2 * tr jjx <> m <> jjx
         -- why is there no <# ?
-        cross  = tr (m <> jx) #> jjt + tr (m <> jjx) #> jt
-        corner = 2 * jt <.> m #> jjt
-    in  (sym upper, cross, corner)
+        cross'  = tr (m <> jx) #> jjt + tr (m <> jjx) #> jt
+        corner' = 2 * jt <.> m #> jjt
+    in  (sym upper', cross', corner')
   where
     m        = diag _sysInertia
     (jt, jx) = _sysJacobian t x
@@ -522,14 +522,6 @@ hamEqs s p@Phs{..} = (dHdp, -dHdq)
     dHdp = velocities s p
     dHdq = dTdq + snd (_sysPotentialGrad s phsTime phsPositions)
 
-tr2
-    :: (KnownNat m, KnownNat n, KnownNat o)
-    => V.Vector m (L n o)
-    -> V.Vector n (L m o)
-tr2 = fmap (fromJust . (\rs -> withRows rs exactDims) . toList)
-    . sequenceA
-    . fmap (fromJust . V.fromList . toRows)
-
 -- | Step a system through phase space over over a single timestep.
 stepHam
     :: forall m n. (KnownNat m, KnownNat n)
@@ -571,23 +563,22 @@ evolveHam
     -> Phase n              -- ^ initial state, in phase space
     -> V.Vector s Double    -- ^ desired solution times
     -> V.Vector s (Phase n)
-evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
-                  $ odeSolveV RKf45 hi eps eps (const f) (fromPs p0) ts'
+evolveHam s p0 ts = V.zipWith toPs ts . fromJust . V.fromList . LA.toRows
+                  $ odeSolveV RKf45 hi eps eps f (fromPs p0) ts'
   where
     hi  = (V.unsafeIndex ts 1 - V.unsafeIndex ts 0) / 100
     eps = 1.49012e-08
-    f :: LA.Vector Double -> LA.Vector Double
-    f   = uncurry (\p m -> LA.vjoin [p,m])
-        . join bimap extract . hamEqs s . toPs
+    f :: Double -> LA.Vector Double -> LA.Vector Double
+    f t = uncurry (\p m -> LA.vjoin [p,m])
+        . join bimap extract . hamEqs s . toPs t
     ts' = VG.fromSized . VG.convert $ ts
     n = fromInteger $ natVal (Proxy @n)
     fromPs :: Phase n -> LA.Vector Double
     fromPs p = LA.vjoin . map extract $ [phsPositions p, phsMomenta p]
-    toPs :: LA.Vector Double -> Phase n
-    toPs v = Phs (VS.unsafeHead t) pP pM
+    toPs :: Double -> LA.Vector Double -> Phase n
+    toPs t v = Phs t pP pM
       where
-        t : vs = LA.takesV [1,n,n] v
-        Just [pP, pM] = traverse create vs
+        Just [pP, pM] = traverse create (LA.takesV [n, n] v)
 
 -- | A convenience wrapper for 'evolveHam'' that works on configuration
 -- space states instead of phase space states.
