@@ -181,15 +181,15 @@ data Sym' n = Sym' { sUpper  :: !(Sym n)
                    , sCorner :: !(Double)
                    }
 
-sysJacobian
-    :: (KnownNat m, KnownNat n, KnownNat (n + 1))
-    => System m n
-    -> Double
-    -> R n
-    -> L m (n + 1)
-sysJacobian Sys{..} t x = jx ||| col jt
-  where
-    (jt, jx) = _sysJacobian t x
+-- sysJacobian
+--     :: (KnownNat m, KnownNat n, KnownNat (n + 1))
+--     => System m n
+--     -> Double
+--     -> R n
+--     -> L m (n + 1)
+-- sysJacobian Sys{..} t x = jx ||| col jt
+--   where
+--     (jt, jx) = _sysJacobian t x
 
 
 -- coordShift
@@ -237,11 +237,11 @@ vec2l
     -> L m n
 vec2l = fromJust . (\rs -> withRows rs exactDims) . toList . fmap vec2r
 
--- l2vec
---     :: (KnownNat m, KnownNat n)
---     => L m n
---     -> V.Vector m (V.Vector n Double)
--- l2vec = fromJust . V.fromList . map r2vec . toRows
+l2vec
+    :: (KnownNat m, KnownNat n)
+    => L m n
+    -> V.Vector m (V.Vector n Double)
+l2vec = fromJust . V.fromList . map r2vec . toRows
 
 data Chron f a = Chron { chronTime :: !a
                        , chronVal  :: !(f a)
@@ -344,37 +344,57 @@ momenta
     => System m n
     -> Config n
     -> R n
-momenta s Cfg{..} = case jmj s cfgTime cfgPositions of
+momenta s Cfg{..} = case sysJMJ s cfgTime cfgPositions of
     Sym'{..} -> (unSym sUpper #> cfgPositions) + sCross
-        -- withNatOp (%+) (Proxy @n) (Proxy @1) $
-    -- let j = sysJacobian s cfgTime cfgPositions
-    -- in  initR $ tr j #> diag (_sysInertia s) #> j #> (cfgVelocities & 1)
-  -- where
-  --   j = sysJacobian s cfgTime cfgPositions
-  --   -- (jt, jx) = _sysJacobian cfgTime cfgPositions
 
+quadForm
+    :: KnownNat n
+    => R n
+    -> L n n
+    -> Double
+quadForm x a = x <.> a #> x
 
--- (&) :: R n
---     -> Double
---     -> R (n + 1)
--- xs & x = undefined
-
--- initR
---     :: R (n + 1)
---     -> R n
--- initR = undefined
-
-jmj
+sysJMJ
     :: (KnownNat m, KnownNat n)
     => System m n
     -> Double
     -> R n
     -> Sym' n
-jmj Sys{..} t x = Sym' (sym $ tr jx <> m <> jx) (tr jx #> mt) (mt <.> mt)
+sysJMJ Sys{..} t x = Sym' (sym $ tr jx <> m <> jx) (tr jx #> mt) (jt <.> mt)
   where
     m = diag _sysInertia
     (jt, jx) = _sysJacobian t x
     mt = m #> jt
+
+sysJMJ'
+    :: (KnownNat m, KnownNat n)
+    => System m n
+    -> Double
+    -> R n
+    -> V.Vector n (Sym n, R n, Double)
+sysJMJ' Sys{..} t x = flip fmap (chronVal (trJ jj)) $ \(jjx, jjt) ->
+    let upper  = 2 * tr jjx <> m <> jjx
+        -- why is there no <# ?
+        cross  = tr (m <> jx) #> jjt + tr (m <> jjx) #> jt
+        corner = 2 * jt <.> m #> jjt
+    in  (sym upper, cross, corner)
+  where
+    m        = diag _sysInertia
+    (jt, jx) = _sysJacobian t x
+    jj       = _sysJacobian2 t x
+
+trJ
+    :: (KnownNat m, KnownNat n)
+    => V.Vector m (Sym' n)
+    -> Chron (V.Vector n) (L m n, R m)
+trJ j0 = Chron jt jx
+  where
+    jx = fmap (bimap vec2l vec2r . V.unzip) . sequenceA
+       . fmap (\Sym'{..} -> (,) <$> l2vec (unSym sUpper) <*> r2vec sCross)
+       $ j0
+    jt = bimap vec2l vec2r . V.unzip
+       . fmap (\Sym'{..} -> (r2vec sCross, sCorner))
+       $ j0
 
 -- | Convert a configuration-space representaiton of the state of the
 -- system to a phase-space representation.
@@ -399,8 +419,8 @@ keC :: (KnownNat m, KnownNat n)
     -> Double
 keC s = do
     vs <- cfgVelocities
-    ps <- momenta s
-    return $ (vs <.> ps) / 2
+    Sym'{..} <- sysJMJ s <$> cfgTime <*> cfgPositions
+    return $ (quadForm vs (unSym sUpper) + 2 * vs <.> sCross + sCorner) / 2
 
 -- | The Lagrangian of a system (the difference between the kinetic energy
 -- and the potential energy), given the system's state in configuration
@@ -425,10 +445,15 @@ velocities
     => System m n
     -> Phase n
     -> R n
-velocities s Phs{..} = withNatOp (%+) (Proxy @n) (Proxy @1) $
-    let j   = sysJacobian s phsTime phsPositions
-        jmj = tr j <> diag (_sysInertia s) <> j
-    in  initR $ inv jmj #> (phsMomenta & 1)
+velocities s Phs{..} = case sysJMJ s phsTime phsPositions of
+    Sym'{..} -> inv (unSym sUpper) #> (phsMomenta - sCross)
+
+-- momenta s Cfg{..} = case jmj s cfgTime cfgPositions of
+--     Sym'{..} -> (unSym sUpper #> cfgPositions) + sCross
+-- velocities s Phs{..} = withNatOp (%+) (Proxy @n) (Proxy @1) $
+--     let j   = sysJacobian s phsTime phsPositions
+--         jmj = tr j <> diag (_sysInertia s) <> j
+--     in  initR $ inv jmj #> (phsMomenta & 1)
 
     -- let j = sysJacobian s cfgTime cfgPositions
     -- in  initR $ tr j #> diag (_sysInertia s) #> j #> (cfgVelocities & 1)
@@ -454,8 +479,9 @@ keP :: (KnownNat m, KnownNat n)
     -> Double
 keP s = do
     ps <- phsMomenta
-    vs <- velocities s
-    return $ (vs <.> ps) / 2
+    Sym'{..} <- sysJMJ s <$> phsTime <*> phsPositions
+    let jmji = inv $ unSym sUpper
+    return $ (quadForm ps jmji - quadForm sCross jmji + sCorner) / 2
 
 -- | The Hamiltonian of a system (the sum of kinetic energy and the
 -- potential energy), given the system's state in phase space.
@@ -465,9 +491,10 @@ hamiltonian
     -> Phase n
     -> Double
 hamiltonian s = do
-    t <- keP s
-    u <- pe s <$> phsTime <*> phsPositions
-    return (t + u)
+    cfg@Cfg{..} <- fromPhase s
+    let lg = lagrangian s cfg
+    ps <- phsMomenta
+    return $ (cfgVelocities <.> ps) - lg
 
 -- | The "hamiltonian equations" for a given system at a given state in
 -- phase space.  Returns the rate of change of the positions and
@@ -478,19 +505,22 @@ hamEqs
     => System m n
     -> Phase n
     -> (R n, R n)
-hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
+hamEqs s p@Phs{..} = (dHdp, -dHdq)
   where
-    mm   = diag _sysInertia
-    j    = sysJacobian s phsTime phsPositions
-    trj  = tr j
-    j'   = unSym <$> _sysJacobian2 phsTime phsPositions
-    jmj  = trj <> mm <> j
-    ijmj = inv jmj
+    jmj  = sysJMJ s phsTime phsPositions
+    jmj' = sysJMJ' s phsTime phsPositions
     dTdq = vec2r
-         . flip fmap (tr2 j') $ \djdq ->
-             -phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta
-    dHdp = ijmj #> phsMomenta
-    dHdq = dTdq + _sysPotentialGrad phsTime phsPositions
+         . flip fmap jmj' $ \(upper', cross', corner') ->
+             let iUpper  = inv (unSym (sUpper jmj))
+                 iUpper' = - iUpper <> unSym upper' <> iUpper
+             in  phsMomenta <.> iUpper' #> phsMomenta / 2
+               - phsMomenta <.> iUpper' #> sCross jmj
+               - phsMomenta <.> iUpper  #> cross'
+               - sCross jmj <.> iUpper' #> sCross jmj / 2
+               - cross'     <.> iUpper  #> sCross jmj
+               - corner' / 2
+    dHdp = velocities s p
+    dHdq = dTdq + snd (_sysPotentialGrad s phsTime phsPositions)
 
 tr2
     :: (KnownNat m, KnownNat n, KnownNat o)
