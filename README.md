@@ -66,7 +66,7 @@ manipulation.
 [WRH]: https://www.youtube.com/watch?v=SZXHoWwBcDc
 
 See a [blog post][] I wrote on this, and also the [hackage documentation][] and the
-[example runner user guide][] (and its [source][example runner]).
+[example runner user guide][user guide] (and its [source][example runner]).
 
 [blog post]: https://blog.jle.im/entry/introducing-the-hamilton-library.html
 [hackage documentation]: http://hackage.haskell.org/package/hamilton
