@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: nightly-2016-11-26
+resolver: lts-9.0
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -40,10 +40,10 @@ packages:
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps:
-- vector-sized-0.4.1.0
-- hmatrix-0.18.0.0
-- hmatrix-gsl-0.18.0.1
+extra-deps: []
+# - vector-sized-0.4.1.0
+# - hmatrix-0.18.0.0
+# - hmatrix-gsl-0.18.0.1
 
 # Override default flag values for local packages and extra-deps
 flags: {}
