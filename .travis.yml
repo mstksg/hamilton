@@ -30,7 +30,7 @@ matrix:
   # https://github.com/hvr/multi-ghc-travis
   - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
     compiler: ": #GHC 8.0.2"
-    addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,happy-1.19.5,alex-3.1.7,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
   - env: BUILD=cabal GHCVER=8.2.1 CABALVER=2.0 HAPPYVER=1.19.5 ALEXVER=3.1.7
     compiler: ": #GHC 8.2.1"
     addons: {apt: {packages: [cabal-install-2.0,ghc-8.2.1,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
@@ -49,7 +49,7 @@ matrix:
 
   - env: BUILD=stack ARGS="--resolver lts-8"
     compiler: ": #stack 8.0.2"
-    addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [ghc-8.0.2,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
 
   # Nightly builds are allowed to fail
   - env: BUILD=stack ARGS="--resolver nightly"
