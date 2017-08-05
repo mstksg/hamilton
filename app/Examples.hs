@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveFoldable       #-}
 {-# LANGUAGE DeriveFunctor        #-}
@@ -146,7 +147,7 @@ spring mB mW k x0 = SE "Spring hanging from block" (V3 "r" "x" "θ") s f (toPhas
 
 bezier
     :: forall n. KnownNat n
-    => V.Vector (n + 1) (V2 Double)
+    => V.Vector (1 + n) (V2 Double)
     -> SysExample
 bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
   where
@@ -479,22 +480,34 @@ pattern V1 :: a -> V.Vector 1 a
 pattern V1 x <- (V.head->x)
   where
     V1 x = V.singleton x
+#if __GLASGOW_HHASKELL__ >= 802
+{-# COMPLETE V4 #-}
+#endif
 
 type V2 = V.Vector 2
 pattern V2 :: a -> a -> V2 a
 pattern V2 x y <- (V.toList->[x,y])
   where
     V2 x y = fromJust (V.fromList [x,y])
+#if __GLASGOW_HHASKELL__ >= 802
+{-# COMPLETE V4 #-}
+#endif
 
 pattern V3 :: a -> a -> a -> V.Vector 3 a
 pattern V3 x y z <- (V.toList->[x,y,z])
   where
     V3 x y z = fromJust (V.fromList [x,y,z])
+#if __GLASGOW_HHASKELL__ >= 802
+{-# COMPLETE V4 #-}
+#endif
 
 pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
 pattern V4 x y z a <- (V.toList->[x,y,z,a])
   where
     V4 x y z a = fromJust (V.fromList [x,y,z,a])
+#if __GLASGOW_HHASKELL__ >= 802
+{-# COMPLETE V4 #-}
+#endif
 
 r2list
     :: KnownNat n
@@ -517,7 +530,7 @@ logistic pos ht width = \x -> ht / (1 + exp (- beta * (x - pos)))
 
 bezierCurve
     :: forall n f a. (KnownNat n, Applicative f, Num a)
-    => V.Vector (n + 1) (f a)
+    => V.Vector (1 + n) (f a)
     -> a
     -> f a
 bezierCurve ps t =
@@ -532,6 +545,7 @@ bezierCurve ps t =
     factorial :: Int -> Int
     factorial m = product [1..m]
 
+#if !MIN_VERSION_vector_sized(0,6,1)
 instance (KnownNat n, Num a) => Num (V.Vector n a) where
     (+) = liftA2 (+)
     (-) = liftA2 (-)
@@ -545,6 +559,7 @@ instance (KnownNat n, Fractional a) => Fractional (V.Vector n a) where
     (/) = liftA2 (/)
     recip = fmap recip
     fromRational = pure . fromRational
+#endif
 
 deriving instance Ord Color
 
