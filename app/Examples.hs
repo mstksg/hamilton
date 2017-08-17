@@ -445,11 +445,11 @@ plot (wd,ht) pr = map (crop wd ht)
       where
         x = round $ (pX - xmin) * (wd' / xrange)
         y = round $ (pY - ymin) * (ht' / yrange)
-    place aX aY (scale->(V2 pX pY)) i
-        = translate (fAlign aX (imageWidth  i))
-                    (fAlign aY (imageHeight i))
-        . translate pX pY
-        $ i
+    place aX aY p i = case scale p of
+      V2 pX pY -> translate (fAlign aX (imageWidth  i))
+                            (fAlign aY (imageHeight i))
+                . translate pX pY
+                $ i
     labels = [ place LT EQ (V2 xmin 0) . string defAttr $ printf "%.2f" xmin
              , place GT EQ (V2 xmax 0) . string defAttr $ printf "%.2f" xmax
              , place EQ LT (V2 0 ymin) . string defAttr $ printf "%.2f" ymin
@@ -480,8 +480,8 @@ pattern V1 :: a -> V.Vector 1 a
 pattern V1 x <- (V.head->x)
   where
     V1 x = V.singleton x
-#if __GLASGOW_HHASKELL__ >= 802
-{-# COMPLETE V4 #-}
+#if __GLASGOW_HASKELL__ >= 802
+{-# COMPLETE V1 #-}
 #endif
 
 type V2 = V.Vector 2
@@ -489,23 +489,23 @@ pattern V2 :: a -> a -> V2 a
 pattern V2 x y <- (V.toList->[x,y])
   where
     V2 x y = fromJust (V.fromList [x,y])
-#if __GLASGOW_HHASKELL__ >= 802
-{-# COMPLETE V4 #-}
+#if __GLASGOW_HASKELL__ >= 802
+{-# COMPLETE V2 #-}
 #endif
 
 pattern V3 :: a -> a -> a -> V.Vector 3 a
 pattern V3 x y z <- (V.toList->[x,y,z])
   where
     V3 x y z = fromJust (V.fromList [x,y,z])
-#if __GLASGOW_HHASKELL__ >= 802
-{-# COMPLETE V4 #-}
+#if __GLASGOW_HASKELL__ >= 802
+{-# COMPLETE V3 #-}
 #endif
 
 pattern V4 :: a -> a -> a -> a -> V.Vector 4 a
 pattern V4 x y z a <- (V.toList->[x,y,z,a])
   where
     V4 x y z a = fromJust (V.fromList [x,y,z,a])
-#if __GLASGOW_HHASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 802
 {-# COMPLETE V4 #-}
 #endif
 
@@ -544,22 +544,6 @@ bezierCurve ps t =
     n `choose` k = factorial n `div` (factorial (n - k) * factorial k)
     factorial :: Int -> Int
     factorial m = product [1..m]
-
-#if !MIN_VERSION_vector_sized(0,6,1)
-instance (KnownNat n, Num a) => Num (V.Vector n a) where
-    (+) = liftA2 (+)
-    (-) = liftA2 (-)
-    (*) = liftA2 (*)
-    negate = fmap negate
-    abs = fmap abs
-    signum = fmap signum
-    fromInteger = pure . fromInteger
-
-instance (KnownNat n, Fractional a) => Fractional (V.Vector n a) where
-    (/) = liftA2 (/)
-    recip = fmap recip
-    fromRational = pure . fromRational
-#endif
 
 deriving instance Ord Color
 

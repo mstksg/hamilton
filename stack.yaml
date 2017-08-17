@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-9.0
+resolver: nightly-2017-08-15
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -43,7 +43,7 @@ packages:
 extra-deps:
 - vector-sized-0.6.1.0
 # - hmatrix-0.18.0.0
-# - hmatrix-gsl-0.18.0.1
+- hmatrix-gsl-0.18.0.1
 
 # Override default flag values for local packages and extra-deps
 flags: {}
