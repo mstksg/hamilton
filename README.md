@@ -73,7 +73,7 @@ See a [blog post][] I wrote on this, and also the [hackage documentation][] and 
 [example runner]: https://github.com/mstksg/hamilton/blob/master/app/Examples.hs
 [user guide]: https://github.com/mstksg/hamilton#example-app-runner
 
-### Full Exmaple
+### Full Example
 
 Let's turn our double pendulum (with the second pendulum half as long) into an
 actual running program.  Let's say that `g = 5`, `m1 = 1`, and `m2 = 2`.
