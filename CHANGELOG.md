@@ -1,6 +1,15 @@
 Changelog
 =========
 
+Version 0.1.0.2
+---------------
+
+*Jan 21, 2018*
+
+<https://github.com/mstksg/hamilton/releases/tag/v0.1.0.2>
+
+*   Compatibility with *typelits-witneses-0.3.0.0*
+
 Version 0.1.0.1
 ---------------
 

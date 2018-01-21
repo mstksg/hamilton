@@ -428,11 +428,11 @@ evolveHam'
     -> [Phase n]
 evolveHam' _ _ [] = []
 evolveHam' s p0 ts = V.withSizedList (toList ts') $ \(v :: V.Vector s Double) ->
-                       case (Proxy %<=? Proxy) :: (2 :<=? s) of
+                       case Proxy @2 %<=? Proxy @s of
                          LE Refl -> (if l1 then tail else id)
                                   . toList
                                   $ evolveHam s p0 v
-                         NLE Refl -> error "evolveHam': Internal error"
+                         NLE{}   -> error "evolveHam': Internal error"
   where
     (l1, ts') = case ts of
       [x] -> (True , [0,x])
