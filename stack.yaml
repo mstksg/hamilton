@@ -40,9 +40,7 @@ packages:
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps:
-- vector-sized-0.6.1.0
-- hmatrix-gsl-0.18.0.1
+extra-deps: []
 
 # Override default flag values for local packages and extra-deps
 flags: {}

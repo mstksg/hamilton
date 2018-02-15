@@ -1,0 +1,57 @@
+name:                hamilton
+version:             0.1.0.2
+github:              mstksg/hamilton
+license:             BSD3
+author:              Justin Le
+maintainer:          justin@jle.im
+copyright:           (c) Justin Le 2018
+tested-with:         GHC >= 8.0
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+synopsis:            Physics on generalized coordinate systems using Hamiltonian Mechanics and AD
+category:            Physics
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description: See README.md (or read online at <https://github.com/mstksg/hamilton#readme>)
+
+ghc-options:
+- -Wall
+- -O2
+
+dependencies:
+- base >=4.9 && <5
+- hmatrix >=0.18
+- vector-sized >=0.6
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Numeric.Hamilton
+  dependencies:
+  - ad
+  - comonad
+  - free
+  - hmatrix-gsl >=0.18
+  - typelits-witnesses >=0.2.3
+
+executables:
+  hamilton-examples:
+    main: Examples.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - ansi-wl-pprint
+    - containers
+    - hamilton
+    - optparse-applicative >=0.13
+    - vector
+    - vty
