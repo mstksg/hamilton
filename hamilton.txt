@@ -7,7 +7,7 @@
 --   See README.md (or read online at
 --   <a>https://github.com/mstksg/hamilton#readme</a>)
 @package hamilton
-@version 0.1.0.0
+@version 0.1.0.2
 
 
 -- | Simulate physical systems on generalized/arbitrary coordinates using
@@ -188,5 +188,5 @@ evolveHamC :: forall m n s. (KnownNat m, KnownNat n, KnownNat s, 2 <= s) => Syst
 evolveHamC' :: forall m n. (KnownNat m, KnownNat n) => System m n -> Config n -> [Double] -> [Config n]
 instance GHC.Generics.Generic (Numeric.Hamilton.Phase a)
 instance GHC.Generics.Generic (Numeric.Hamilton.Config a)
-instance GHC.TypeLits.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Config n)
-instance GHC.TypeLits.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Phase n)
+instance GHC.TypeNats.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Config n)
+instance GHC.TypeNats.KnownNat n => GHC.Show.Show (Numeric.Hamilton.Phase n)
