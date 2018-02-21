@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wall            #-}
+
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE GADTs               #-}
@@ -77,13 +79,14 @@ import           GHC.Generics                 (Generic)
 import           GHC.TypeLits
 import           GHC.TypeLits.Compare
 import           Numeric.AD
-import           Numeric.GSL.ODE
 import           Numeric.LinearAlgebra.Static
 import qualified Control.Comonad              as C
 import qualified Control.Comonad.Cofree       as C
 import qualified Data.Vector.Generic.Sized    as VG
 import qualified Data.Vector.Sized            as V
 import qualified Numeric.LinearAlgebra        as LA
+
+import qualified Data.List                    as L
 
 -- | Represents the full state of a system of @n@ generalized coordinates
 -- in configuration space (informally, "positions and velocities")
@@ -447,13 +450,13 @@ evolveHam
     -> V.Vector s Double    -- ^ desired solution times
     -> V.Vector s (Phase n)
 evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
-                  $ odeSolveV RKf45 hi eps eps (const f) (fromPs p0) ts'
+                    $ symplecticEuler f (fromPs p0) ts'
   where
     hi  = (V.unsafeIndex ts 1 - V.unsafeIndex ts 0) / 100
-    eps = 1.49012e-08
     f :: LA.Vector Double -> LA.Vector Double
     f   = uncurry (\p m -> LA.vjoin [p,m])
         . join bimap extract . hamEqs s . toPs
+    ts' :: LA.Vector Double
     ts' = VG.fromSized . VG.convert $ ts
     n = fromInteger $ natVal (Proxy @n)
     fromPs :: Phase n -> LA.Vector Double
@@ -462,6 +465,39 @@ evolveHam s p0 ts = fmap toPs . fromJust . V.fromList . LA.toRows
     toPs v = Phs pP pM
       where
         Just [pP, pM] = traverse create . LA.takesV [n, n] $ v
+
+    symplecticEuler :: (LA.Vector Double -> LA.Vector Double) ->
+                       LA.Vector Double ->
+                       LA.Vector Double ->
+                       LA.Matrix Double
+    symplecticEuler f pms ts = LA.fromRows $
+                               map snd $
+                               snd selectedTimeSteps
+      where
+        selectedTimeSteps :: ([(Double, LA.Vector Double)],
+                              [(Double, LA.Vector Double)])
+        selectedTimeSteps =
+          L.mapAccumL (\s t -> let s' = dropWhile (\(x, _) -> x < t) s in (s', head s'))
+                      allTimeSteps vs
+
+        allTimeSteps :: [(Double, LA.Vector Double)]
+        allTimeSteps = zip us (iterate stepOnce pms)
+
+        us :: [Double]
+        us = 0.0 : map (+hi) us
+        vs :: [Double]
+        vs = LA.toList ts
+
+        stepOnce :: LA.Vector Double ->
+                    LA.Vector Double
+        stepOnce pms = LA.vjoin [newPs, newMs]
+          where
+            hs = LA.fromList $ replicate (2*n) hi
+            deltas = hs * f pms
+            newMs = LA.subVector n n pms + LA.subVector n n deltas
+            oldPs = LA.subVector 0 n pms
+            newDeltas = hs * f (LA.vjoin [oldPs, newMs])
+            newPs = LA.subVector 0 n pms + LA.subVector 0 n newDeltas
 
 -- | A convenience wrapper for 'evolveHam'' that works on configuration
 -- space states instead of phase space states.
