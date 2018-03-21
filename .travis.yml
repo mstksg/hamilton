@@ -53,7 +53,7 @@ matrix:
   # variable, such as using --stack-yaml to point to a different file.
   - env: BUILD=stack ARGS=""
     compiler: ": #stack default"
-    addons: {apt: {packages: [ghc-8.0.2,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [ghc-8.4.1,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
 
   # - env: BUILD=stack ARGS="--resolver lts-7"
   #   compiler: ": #stack 8.0.1"
