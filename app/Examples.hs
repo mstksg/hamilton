@@ -37,6 +37,7 @@ import           Data.Foldable
 import           Data.IORef
 import           Data.List
 import           Data.Maybe
+import           Data.Semigroup                      ((<>))
 import           GHC.TypeLits
 import           Graphics.Vty hiding                 (Config, (<|>))
 import           Numeric.Hamilton
