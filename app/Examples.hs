@@ -1,22 +1,23 @@
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DeriveFoldable       #-}
-{-# LANGUAGE DeriveFunctor        #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE PatternSynonyms      #-}
-{-# LANGUAGE RecordWildCards      #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TupleSections        #-}
-{-# LANGUAGE TypeApplications     #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE ViewPatterns         #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE CPP                                      #-}
+{-# LANGUAGE DataKinds                                #-}
+{-# LANGUAGE DeriveFoldable                           #-}
+{-# LANGUAGE DeriveFunctor                            #-}
+{-# LANGUAGE FlexibleContexts                         #-}
+{-# LANGUAGE FlexibleInstances                        #-}
+{-# LANGUAGE GADTs                                    #-}
+{-# LANGUAGE LambdaCase                               #-}
+{-# LANGUAGE OverloadedStrings                        #-}
+{-# LANGUAGE PatternSynonyms                          #-}
+{-# LANGUAGE RecordWildCards                          #-}
+{-# LANGUAGE ScopedTypeVariables                      #-}
+{-# LANGUAGE StandaloneDeriving                       #-}
+{-# LANGUAGE TupleSections                            #-}
+{-# LANGUAGE TypeApplications                         #-}
+{-# LANGUAGE TypeOperators                            #-}
+{-# LANGUAGE TypeSynonymInstances                     #-}
+{-# LANGUAGE ViewPatterns                             #-}
+{-# OPTIONS_GHC -fno-warn-orphans                     #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 -- | Hamilton example suite
 --
@@ -31,12 +32,11 @@
 import           Control.Concurrent
 import           Control.Monad
 import           Data.Bifunctor
+import           Data.Finite
 import           Data.Foldable
 import           Data.IORef
 import           Data.List
 import           Data.Maybe
-import           Data.Monoid
-import           Data.Proxy
 import           GHC.TypeLits
 import           Graphics.Vty hiding                 (Config, (<|>))
 import           Numeric.Hamilton
@@ -146,7 +146,7 @@ spring mB mW k x0 = SE "Spring hanging from block" (V3 "r" "x" "θ") s f (toPhas
     c0 = Cfg (vec3 0 x0 0) (vec3 1 0 (-0.5))
 
 bezier
-    :: forall n. KnownNat n
+    :: forall n. KnownNat (1 + n)
     => V.Vector (1 + n) (V2 Double)
     -> SysExample
 bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
@@ -529,17 +529,19 @@ logistic pos ht width = \x -> ht / (1 + exp (- beta * (x - pos)))
 
 
 bezierCurve
-    :: forall n f a. (KnownNat n, Applicative f, Num a)
+    :: forall n f a. (KnownNat (1 + n), Applicative f, Num a)
     => V.Vector (1 + n) (f a)
     -> a
     -> f a
 bezierCurve ps t =
       foldl' (liftA2 (+)) (pure 0)
-    . V.imap (\i -> fmap ((* (fromIntegral (n' `choose` i) * (1 - t)^(n' - i) * t^i))))
+    . V.imap (\i -> let i' = fromIntegral i
+                    in  fmap (* (fromIntegral (n' `choose` i') * (1 - t)^(n' - i') * t^i))
+             )
     $ ps
   where
     n' :: Int
-    n' = fromInteger $ natVal (Proxy @n)
+    n' = fromIntegral (maxBound :: Finite (1 + n))
     choose :: Int -> Int -> Int
     n `choose` k = factorial n `div` (factorial (n - k) * factorial k)
     factorial :: Int -> Int

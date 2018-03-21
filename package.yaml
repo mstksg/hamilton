@@ -1,5 +1,5 @@
 name:                hamilton
-version:             0.1.0.2
+version:             0.1.0.3
 github:              mstksg/hamilton
 license:             BSD3
 author:              Justin Le
@@ -27,7 +27,7 @@ ghc-options:
 dependencies:
 - base >=4.9 && <5
 - hmatrix >=0.18
-- vector-sized >=0.6
+- vector-sized >=1.0
 
 library:
   source-dirs: src
@@ -38,6 +38,7 @@ library:
   - comonad
   - free
   - hmatrix-gsl >=0.18
+  - hmatrix-vector-sized
   - typelits-witnesses >=0.2.3
 
 executables:
@@ -51,6 +52,8 @@ executables:
     dependencies:
     - ansi-wl-pprint
     - containers
+    - finite-typelits
+    - ghc-typelits-knownnat
     - hamilton
     - optparse-applicative >=0.13
     - vector

@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -10,7 +9,6 @@
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeInType          #-}
 {-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE ViewPatterns        #-}
 
 -- |
 -- Module      : Numeric.Hamilton
@@ -72,18 +70,19 @@ import           Data.Foldable
 import           Data.Kind
 import           Data.Maybe
 import           Data.Proxy
-import           Data.Type.Equality hiding    (sym)
-import           GHC.Generics                 (Generic)
+import           Data.Type.Equality hiding           (sym)
+import           GHC.Generics                        (Generic)
 import           GHC.TypeLits
 import           GHC.TypeLits.Compare
 import           Numeric.AD
 import           Numeric.GSL.ODE
-import           Numeric.LinearAlgebra.Static
-import qualified Control.Comonad              as C
-import qualified Control.Comonad.Cofree       as C
-import qualified Data.Vector.Generic.Sized    as VG
-import qualified Data.Vector.Sized            as V
-import qualified Numeric.LinearAlgebra        as LA
+import           Numeric.LinearAlgebra.Static        as H
+import           Numeric.LinearAlgebra.Static.Vector
+import qualified Control.Comonad                     as C
+import qualified Control.Comonad.Cofree              as C
+import qualified Data.Vector.Generic.Sized           as VG
+import qualified Data.Vector.Sized                   as V
+import qualified Numeric.LinearAlgebra               as LA
 
 -- | Represents the full state of a system of @n@ generalized coordinates
 -- in configuration space (informally, "positions and velocities")
@@ -192,25 +191,11 @@ pe  :: System m n
     -> Double
 pe = _sysPotential
 
-vec2r
-    :: KnownNat n => V.Vector n Double -> R n
-vec2r = fromJust . create . VG.fromSized . VG.convert
-
-r2vec
-    :: KnownNat n => R n -> V.Vector n Double
-r2vec = VG.convert . fromJust . VG.toSized . extract
-
 vec2l
     :: (KnownNat m, KnownNat n)
     => V.Vector m (V.Vector n Double)
     -> L m n
-vec2l = fromJust . (\rs -> withRows rs exactDims) . toList . fmap vec2r
-
--- l2vec
---     :: (KnownNat m, KnownNat n)
---     => L m n
---     -> V.Vector m (V.Vector n Double)
--- l2vec = fromJust . V.fromList . map r2vec . toRows
+vec2l = rowsL . fmap (vecR . VG.convert)
 
 -- | Create a system with @n@ generalized coordinates by describing its
 -- coordinate space (by a function from the generalized coordinates to the
@@ -235,15 +220,16 @@ mkSystem
     -> System m n
 mkSystem m f u =
     Sys m
-        (vec2r . f . r2vec)
-        (tr . vec2l . jacobianT f . r2vec)
+        (vecR . VG.convert . f . VG.convert . rVec)
+        (tr . vec2l . jacobianT f . VG.convert . rVec)
         (fmap (sym . vec2l . j2 . C.hoistCofree VG.convert)
            . VG.convert
            . jacobians f
-           . r2vec
+           . VG.convert
+           . rVec
            )
-        (u . r2vec)
-        (vec2r . grad u . r2vec)
+        (u . VG.convert . rVec)
+        (vecR . VG.convert . grad u . VG.convert . rVec)
   where
     j2  :: C.Cofree (V.Vector n) Double
         -> V.Vector n (V.Vector n Double)
@@ -336,7 +322,7 @@ velocities
 velocities Sys{..} Phs{..} = inv jmj #> phsMomenta
   where
     j   = _sysJacobian phsPositions
-    jmj = tr j <> diag _sysInertia <> j
+    jmj = tr j H.<> diag _sysInertia H.<> j
 
 -- | Invert 'toPhase' and convert a description of a system's state in
 -- phase space to a description of the system's state in configuration
@@ -389,9 +375,9 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     j    = _sysJacobian phsPositions
     trj  = tr j
     j'   = unSym <$> _sysJacobian2 phsPositions
-    jmj  = trj <> mm <> j
+    jmj  = trj H.<> mm H.<> j
     ijmj = inv jmj
-    dTdq = vec2r
+    dTdq = vecR . VG.convert
          . flip fmap (tr2 j') $ \djdq ->
              -phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta
     dHdp = ijmj #> phsMomenta
@@ -401,9 +387,8 @@ tr2
     :: (KnownNat m, KnownNat n, KnownNat o)
     => V.Vector m (L n o)
     -> V.Vector n (L m o)
-tr2 = fmap (fromJust . (\rs -> withRows rs exactDims) . toList)
-    . sequenceA
-    . fmap (fromJust . V.fromList . toRows)
+tr2 = fmap (fromJust . (`withRows` exactDims) . toList)
+    . traverse (fromJust . V.fromList . toRows)
 
 -- | Step a system through phase space over over a single timestep.
 stepHam

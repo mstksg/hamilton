@@ -1,6 +1,17 @@
 Changelog
 =========
 
+Version 0.1.0.3
+---------------
+
+*Mar 20, 2018*
+
+<https://github.com/mstksg/hamilton/releases/tag/v0.1.0.3>
+
+*   Compatibility with *base-4.11.0.0* and GHC 8.4
+*   Compatibility with *vector-sized-1.0.0.0*
+*   Internal conversion functions refactored using *hmatrix-vector-sized*.
+
 Version 0.1.0.2
 ---------------
 
