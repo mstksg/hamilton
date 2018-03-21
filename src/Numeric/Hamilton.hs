@@ -70,7 +70,7 @@ import           Data.Foldable
 import           Data.Kind
 import           Data.Maybe
 import           Data.Proxy
-import           Data.Type.Equality hiding           (sym)
+import           Data.Type.Equality
 import           GHC.Generics                        (Generic)
 import           GHC.TypeLits
 import           GHC.TypeLits.Compare
@@ -78,8 +78,6 @@ import           Numeric.AD
 import           Numeric.GSL.ODE
 import           Numeric.LinearAlgebra.Static        as H
 import           Numeric.LinearAlgebra.Static.Vector
-import qualified Control.Comonad                     as C
-import qualified Control.Comonad.Cofree              as C
 import qualified Data.Vector.Generic.Sized           as VG
 import qualified Data.Vector.Sized                   as V
 import qualified Numeric.LinearAlgebra               as LA
@@ -156,24 +154,11 @@ data System :: Nat -> Nat -> Type where
     Sys :: { _sysInertia        :: R m
            , _sysCoords         :: R n -> R m
            , _sysJacobian       :: R n -> L m n
-           , _sysJacobian2      :: R n -> V.Vector m (Sym n)
+           , _sysJacobian2      :: R n -> V.Vector m (L n n)
            , _sysPotential      :: R n -> Double
            , _sysPotentialGrad  :: R n -> R n
            }
         -> System m n
-
--- coordShift
---     :: (KnownNat m, KnownNat n, KnownNat o)
---     => (R o -> R n)
---     -> (R o -> L n o)
---     -> (R o -> V.Vector n (Sym o))
---     -> System m n
---     -> System m o
--- coordShift c j j2 = \case
---     Sys i c0 j0 j20 p g -> Sys i (c0 . c)
---                                ((<>) <$> j0 . c <*> j)
---                                ((\d -> fmap _) <$> j2 <*> j20 . c)
---                                p g
 
 -- | Converts the position of generalized coordinates of a system to the
 -- coordinates of the system's underlying cartesian coordinate system.
@@ -218,22 +203,14 @@ mkSystem
                 -- ^ The potential energy of the system as a function of
                 -- the generalized coordinate space's positions.
     -> System m n
-mkSystem m f u =
-    Sys m
-        (vecR . VG.convert . f . VG.convert . rVec)
-        (tr . vec2l . jacobianT f . VG.convert . rVec)
-        (fmap (sym . vec2l . j2 . C.hoistCofree VG.convert)
-           . VG.convert
-           . jacobians f
-           . VG.convert
-           . rVec
-           )
-        (u . VG.convert . rVec)
-        (vecR . VG.convert . grad u . VG.convert . rVec)
-  where
-    j2  :: C.Cofree (V.Vector n) Double
-        -> V.Vector n (V.Vector n Double)
-    j2 = fmap (fmap C.extract . C.unwrap) . C.unwrap
+mkSystem m f u = Sys
+  { _sysInertia       =                     m
+  , _sysCoords        = vecR . VG.convert . f           . VG.convert . rVec
+  , _sysJacobian      = tr . vec2l        . jacobianT f . VG.convert . rVec
+  , _sysJacobian2     = fmap vec2l        . hessianF f  . VG.convert . rVec
+  , _sysPotential     =                     u           . VG.convert . rVec
+  , _sysPotentialGrad = vecR . VG.convert . grad u      . VG.convert . rVec
+  }
 
 -- | Convenience wrapper over 'mkSystem' that allows you to specify the
 -- potential energy function in terms of the underlying cartesian
@@ -374,7 +351,7 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     mm   = diag _sysInertia
     j    = _sysJacobian phsPositions
     trj  = tr j
-    j'   = unSym <$> _sysJacobian2 phsPositions
+    j'   = _sysJacobian2 phsPositions
     jmj  = trj H.<> mm H.<> j
     ijmj = inv jmj
     dTdq = vecR . VG.convert

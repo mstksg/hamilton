@@ -35,8 +35,6 @@ library:
   - Numeric.Hamilton
   dependencies:
   - ad
-  - comonad
-  - free
   - hmatrix-gsl >=0.18
   - hmatrix-vector-sized
   - typelits-witnesses >=0.2.3
