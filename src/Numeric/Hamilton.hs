@@ -151,12 +151,12 @@ deriving instance KnownNat n => Show (Phase n)
 -- describes the system in configuration space) or a @'Phase' n@ (which
 -- describes the system in phase space).
 data System :: Nat -> Nat -> Type where
-    Sys :: { _sysInertia        :: R m
-           , _sysCoords         :: R n -> R m
-           , _sysJacobian       :: R n -> L m n
-           , _sysJacobian2      :: R n -> V.Vector m (L n n)
-           , _sysPotential      :: R n -> Double
-           , _sysPotentialGrad  :: R n -> R n
+    Sys :: { _sysInertia       :: R m
+           , _sysCoords        :: R n -> R m
+           , _sysJacobian      :: R n -> L m n
+           , _sysHessian       :: R n -> V.Vector n (L m n)
+           , _sysPotential     :: R n -> Double
+           , _sysPotentialGrad :: R n -> R n
            }
         -> System m n
 
@@ -204,13 +204,20 @@ mkSystem
                 -- the generalized coordinate space's positions.
     -> System m n
 mkSystem m f u = Sys
-  { _sysInertia       =                     m
-  , _sysCoords        = vecR . VG.convert . f           . VG.convert . rVec
-  , _sysJacobian      = tr . vec2l        . jacobianT f . VG.convert . rVec
-  , _sysJacobian2     = fmap vec2l        . hessianF f  . VG.convert . rVec
-  , _sysPotential     =                     u           . VG.convert . rVec
-  , _sysPotentialGrad = vecR . VG.convert . grad u      . VG.convert . rVec
-  }
+    { _sysInertia       =                     m
+    , _sysCoords        = vecR . VG.convert . f           . VG.convert . rVec
+    , _sysJacobian      = tr   . vec2l      . jacobianT f . VG.convert . rVec
+    , _sysHessian       = tr2  . fmap vec2l . hessianF f  . VG.convert . rVec
+    , _sysPotential     =                     u           . VG.convert . rVec
+    , _sysPotentialGrad = vecR . VG.convert . grad u      . VG.convert . rVec
+    }
+  where
+    tr2 :: forall o. (KnownNat n, KnownNat o)
+        => V.Vector m (L n o)
+        -> V.Vector n (L m o)
+    tr2 = fmap rowsL . traverse lRows
+    {-# INLINE tr2 #-}
+
 
 -- | Convenience wrapper over 'mkSystem' that allows you to specify the
 -- potential energy function in terms of the underlying cartesian
@@ -341,6 +348,9 @@ hamiltonian s = do
 -- phase space.  Returns the rate of change of the positions and
 -- conjugate momenta, which can be used to progress the simulation through
 -- time.
+--
+-- Computed using the maths derived in
+-- <https://blog.jle.im/entry/hamiltonian-dynamics-in-haskell.html>.
 hamEqs
     :: (KnownNat m, KnownNat n)
     => System m n
@@ -351,21 +361,13 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     mm   = diag _sysInertia
     j    = _sysJacobian phsPositions
     trj  = tr j
-    j'   = _sysJacobian2 phsPositions
     jmj  = trj H.<> mm H.<> j
     ijmj = inv jmj
     dTdq = vecR . VG.convert
-         . flip fmap (tr2 j') $ \djdq ->
+         . flip fmap (_sysHessian phsPositions) $ \djdq ->
              -phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta
     dHdp = ijmj #> phsMomenta
     dHdq = dTdq + _sysPotentialGrad phsPositions
-
-tr2
-    :: (KnownNat m, KnownNat n, KnownNat o)
-    => V.Vector m (L n o)
-    -> V.Vector n (L m o)
-tr2 = fmap (fromJust . (`withRows` exactDims) . toList)
-    . traverse (fromJust . V.fromList . toRows)
 
 -- | Step a system through phase space over over a single timestep.
 stepHam

@@ -1,6 +1,18 @@
 Changelog
 =========
 
+Version 0.1.0.4
+---------------
+
+*Unreleased*
+
+<https://github.com/mstksg/hamilton/releases/tag/v0.1.0.4>
+
+*Internal*
+
+*   Rewrote more internal functions using *hmatrix-vector-sized*, which should
+    yield performance benefits.
+
 Version 0.1.0.3
 ---------------
 
@@ -10,6 +22,9 @@ Version 0.1.0.3
 
 *   Compatibility with *base-4.11.0.0* and GHC 8.4
 *   Compatibility with *vector-sized-1.0.0.0*
+
+*Internal*
+
 *   Internal conversion functions refactored using *hmatrix-vector-sized*,
     *hessianF*.
 
