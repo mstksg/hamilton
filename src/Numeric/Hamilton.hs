@@ -376,7 +376,7 @@ stepHam
     -> System m n       -- ^ system to simulate
     -> Phase n          -- ^ initial state, in phase space
     -> Phase n
-stepHam r s p = evolveHam @m @n @2 s p (fromJust $ V.fromList [0, r])
+stepHam r s p = evolveHam @m @n @2 s p (V.fromTuple (0, r))
                   `V.unsafeIndex` 1
 
 -- | Evolve a system using a hamiltonian stepper, with the given initial

@@ -28,6 +28,7 @@ dependencies:
 - base >=4.9 && <5
 - hmatrix >=0.18
 - vector-sized >=1.0
+- hmatrix-vector-sized >= 0.1.0.0
 
 library:
   source-dirs: src
@@ -36,7 +37,6 @@ library:
   dependencies:
   - ad
   - hmatrix-gsl >=0.18
-  - hmatrix-vector-sized >= 0.1.0.0
   - typelits-witnesses >=0.2.3
 
 executables:
