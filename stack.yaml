@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: nightly-2018-05-11
+resolver: nightly-2018-11-13
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -40,12 +40,12 @@ packages:
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: []
-# - vector-sized-1.0.0.0
-# - vty-5.21
-# - finite-typelits-0.1.3.0
-# - hmatrix-vector-sized-0.1.0.0
-# - indexed-list-literals-0.1.0.1
+extra-deps:
+- vector-sized-1.1.1.0
+- vty-5.25.1
+- finite-typelits-0.1.4.2
+- hmatrix-vector-sized-0.1.1.2
+- indexed-list-literals-0.2.1.2
 
 # Override default flag values for local packages and extra-deps
 flags: {}

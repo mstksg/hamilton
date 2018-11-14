@@ -39,9 +39,13 @@ matrix:
     compiler: ": #GHC 8.2.2"
     addons: {apt: {packages: [cabal-install-2.0,ghc-8.2.2,happy-1.19.5,alex-3.1.7,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
 
-  - env: BUILD=cabal GHCVER=8.4.1 CABALVER=2.2 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    compiler: ": #GHC 8.4.1"
-    addons: {apt: {packages: [cabal-install-2.2,ghc-8.4.1,happy-1.19.5,alex-3.1.7,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=8.4.4 CABALVER=2.2 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 8.4.4"
+    addons: {apt: {packages: [cabal-install-2.2,ghc-8.4.4,happy-1.19.5,alex-3.1.7,libblas-dev,liblapack-dev], sources: [hvr-ghc]}}
+
+  - env: BUILD=cabal GHCVER=8.6.2 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 8.6.2"
+    addons: {apt: {packages: [cabal-install-2.4,ghc-8.6.2,happy-1.19.5,alex-3.1.7,libblas-dev,liblapack-dev], sources: [hvr-ghc]}}
 
   # Build with the newest GHC and cabal-install. This is an accepted failure,
   # see below.
@@ -54,10 +58,6 @@ matrix:
   - env: BUILD=stack ARGS=""
     compiler: ": #stack default"
     addons: {apt: {packages: [ghc-8.4.1,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
-
-  # - env: BUILD=stack ARGS="--resolver lts-7"
-  #   compiler: ": #stack 8.0.1"
-  #   addons: {apt: {packages: [ghc-8.0.1,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
 
   - env: BUILD=stack ARGS="--resolver lts-8"
     compiler: ": #stack 8.0.2"
@@ -73,7 +73,11 @@ matrix:
 
   - env: BUILD=stack ARGS="--resolver lts-11"
     compiler: ": #stack 8.2.2"
-    addons: {apt: {packages: [ghc-8.2.2,libblas-dev,liblapack-dev,libgsl0-dev], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [ghc-8.2.2,libblas-dev,liblapack-dev], sources: [hvr-ghc]}}
+
+  - env: BUILD=stack ARGS="--resolver lts-12"
+    compiler: ": #stack 8.4.4"
+    addons: {apt: {packages: [ghc-8.4.4,libblas-dev,liblapack-dev], sources: [hvr-ghc]}}
 
   # Nightly builds are allowed to fail
   - env: BUILD=stack ARGS="--resolver nightly"
@@ -99,6 +103,10 @@ matrix:
 
   - env: BUILD=stack ARGS="--resolver lts-11"
     compiler: ": #stack 8.2.2 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-12"
+    compiler: ": #stack 8.4.4 osx"
     os: osx
 
   - env: BUILD=stack ARGS="--resolver nightly"
