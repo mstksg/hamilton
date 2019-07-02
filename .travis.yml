@@ -236,6 +236,12 @@ before_install:
   mkdir -p $HOME/.cabal
   echo 'remote-repo: hackage.haskell.org:http://hackage.fpcomplete.com/' > $HOME/.cabal/config
   echo 'remote-repo-cache: $HOME/.cabal/packages' >> $HOME/.cabal/config
+- |
+  if [ `uname` = "Darwin" ]
+  then
+    brew update
+    brew install gsl
+  fi
 language: generic
 sudo: false
 
