@@ -25,8 +25,8 @@
 --
 -- Or just run with:
 --
--- > $ hamtilton-examples --help
--- > $ hamtilton-examples [EXAMPLE] --help
+-- > $ hamilton-examples --help
+-- > $ hamilton-examples [EXAMPLE] --help
 --
 
 import           Control.Concurrent
@@ -49,7 +49,6 @@ import           Text.Read
 import qualified Data.List.NonEmpty                  as NE
 import qualified Data.Map.Strict                     as M
 import qualified Data.Vector                         as VV
-import qualified Data.Vector.Generic.Sized           as VG
 import qualified Data.Vector.Sized                   as V
 import qualified Data.Vector.Storable.Sized          as VS
 import qualified Text.PrettyPrint.ANSI.Leijen        as PP
@@ -72,7 +71,7 @@ pendulum θ0 ω0 = SE "Single pendulum" (V1 "θ") s f (toPhase s c0)
                   (\(V1 θ)   -> V2 (sin θ) (0.5 - cos θ))     -- coordinates
                   (\(V2 _ y) -> y                       )     -- potential
     f :: R 2 -> [V2 Double]
-    f xs = [VG.convert (rVec xs)]
+    f xs = [grVec xs]
     c0 :: Config 1
     c0 = Cfg (konst θ0 :: R 1) (konst ω0 :: R 1)
 
@@ -87,7 +86,7 @@ doublePendulum m1 m2 = SE "Double pendulum" (V2 "θ1" "θ2") s f (toPhase s c0)
                   (\(V4 _ y1 _ y2) -> 5 * (realToFrac m1 * y1 + realToFrac m2 * y2))
                                          -- potential
     f :: R 4 -> [V2 Double]
-    f (split->(xs,ys))= VG.convert . rVec <$> [xs, ys]
+    f (split->(xs,ys))= grVec <$> [xs, ys]
     c0 :: Config 2
     c0 = Cfg (vec2 (pi/2) 0) (vec2 0 0)
 
@@ -105,7 +104,7 @@ room θ = SE "Room" (V2 "x" "y") s f (toPhase s c0)
                                    ]
                  )                  -- potential
     f :: R 2 -> [V2 Double]
-    f xs = [VG.convert (rVec xs)]
+    f xs = [grVec xs]
     c0 :: Config 2
     c0 = Cfg (vec2 (-1) 0.25) (vec2 (cos θ) (sin θ))
 
@@ -125,7 +124,7 @@ twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
                  )                 -- coordinates
                  (\(V2 r _) -> - realToFrac (m1 * m2) / r)  -- potential
     f :: R 4 -> [V2 Double]
-    f (split->(xs,ys))= VG.convert . rVec <$> [xs, ys]
+    f (split->(xs,ys))= grVec <$> [xs, ys]
     c0 :: Config 2
     c0 = Cfg (vec2 2 0) (vec2 0 ω0)
 
@@ -142,7 +141,7 @@ spring mB mW k x0 = SE "Spring hanging from block" (V3 "r" "x" "θ") s f (toPhas
                               + realToFrac mB * ((1 + x) * (-cos θ))  -- gravity
                  )
     f :: R 3 -> [V2 Double]
-    f (headTail->(b,w)) = [V2 b 1, V2 0 1 + VG.convert (rVec w)]
+    f (headTail->(b,w)) = [V2 b 1, V2 0 1 + grVec w]
     c0 :: Config 3
     c0 = Cfg (vec3 0 x0 0) (vec3 1 0 (-0.5))
 
@@ -159,7 +158,7 @@ bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
                            +      logistic 1 5 0.05 t            -- right wall
                  )
     f :: R 2 -> [V2 Double]
-    f xs = [VG.convert (rVec xs)]
+    f xs = [grVec xs]
     c0 :: Config 1
     c0 = Cfg (0.5 :: R 1) (0.25 :: R 1)
 

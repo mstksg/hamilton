@@ -180,7 +180,7 @@ vec2l
     :: (KnownNat m, KnownNat n)
     => V.Vector m (V.Vector n Double)
     -> L m n
-vec2l = rowsL . fmap (vecR . VG.convert)
+vec2l = rowsL . fmap gvecR
 
 -- | Create a system with @n@ generalized coordinates by describing its
 -- coordinate space (by a function from the generalized coordinates to the
@@ -205,11 +205,11 @@ mkSystem
     -> System m n
 mkSystem m f u = Sys
     { _sysInertia       =                     m
-    , _sysCoords        = vecR . VG.convert . f           . VG.convert . rVec
-    , _sysJacobian      = tr   . vec2l      . jacobianT f . VG.convert . rVec
-    , _sysHessian       = tr2  . fmap vec2l . hessianF f  . VG.convert . rVec
-    , _sysPotential     =                     u           . VG.convert . rVec
-    , _sysPotentialGrad = vecR . VG.convert . grad u      . VG.convert . rVec
+    , _sysCoords        = gvecR             . f           . grVec
+    , _sysJacobian      = tr   . vec2l      . jacobianT f . grVec
+    , _sysHessian       = tr2  . fmap vec2l . hessianF f  . grVec
+    , _sysPotential     =                     u           . grVec
+    , _sysPotentialGrad = gvecR             . grad u      . grVec
     }
   where
     tr2 :: forall o. (KnownNat n, KnownNat o)
@@ -363,7 +363,7 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     trj  = tr j
     jmj  = trj H.<> mm H.<> j
     ijmj = inv jmj
-    dTdq = vecR . VG.convert
+    dTdq = gvecR
          . flip fmap (_sysHessian phsPositions) $ \djdq ->
              -phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta
     dHdp = ijmj #> phsMomenta

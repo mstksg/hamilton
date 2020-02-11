@@ -31,153 +31,6 @@ script:
       ;;
   esac
   set +ex
-matrix:
-  include:
-  - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        packages:
-        - cabal-install-1.24
-        - ghc-8.0.2
-        - happy-1.19.5
-        - alex-3.1.7
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #GHC 8.0.2'
-  - env: BUILD=cabal GHCVER=8.2.2 CABALVER=2.0 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        packages:
-        - cabal-install-2.0
-        - ghc-8.2.2
-        - happy-1.19.5
-        - alex-3.1.7
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #GHC 8.2.2'
-  - env: BUILD=cabal GHCVER=8.4.4 CABALVER=2.2 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        packages:
-        - cabal-install-2.2
-        - ghc-8.4.4
-        - happy-1.19.5
-        - alex-3.1.7
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #GHC 8.4.4'
-  - env: BUILD=cabal GHCVER=8.6.5 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        packages:
-        - cabal-install-2.4
-        - ghc-8.6.5
-        - happy-1.19.5
-        - alex-3.1.7
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #GHC 8.6.5'
-  - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        packages:
-        - cabal-install-head
-        - ghc-head
-        - happy-1.19.5
-        - alex-3.1.7
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #GHC HEAD'
-  - env: BUILD=stack ARGS=""
-    addons:
-      apt:
-        packages:
-        - libgmp-dev
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #stack default'
-  - env: BUILD=stack ARGS="--resolver lts-9"
-    addons:
-      apt:
-        packages:
-        - libgmp-dev
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #stack 8.0.2'
-  - env: BUILD=stack ARGS="--resolver lts-11"
-    addons:
-      apt:
-        packages:
-        - libgmp-dev
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #stack 8.2.2'
-  - env: BUILD=stack ARGS="--resolver lts-12"
-    addons:
-      apt:
-        packages:
-        - libgmp-dev
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #stack 8.4.4'
-  - env: BUILD=stack ARGS="--resolver lts-13"
-    addons:
-      apt:
-        packages:
-        - libgmp-dev
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #stack 8.6.5'
-  - env: BUILD=stack ARGS="--resolver nightly"
-    addons:
-      apt:
-        packages:
-        - libgmp-dev
-        - libblas-dev
-        - libgsl0-dev
-        - liblapack-dev
-    compiler: ': #stack nightly'
-  - env: BUILD=stack ARGS=""
-    os: osx
-    compiler: ': #stack default osx'
-  - env: BUILD=stack ARGS="--resolver lts-9"
-    os: osx
-    compiler: ': #stack 8.0.2 osx'
-  - env: BUILD=stack ARGS="--resolver lts-11"
-    os: osx
-    compiler: ': #stack 8.2.2 osx'
-  - env: BUILD=stack ARGS="--resolver lts-12"
-    os: osx
-    compiler: ': #stack 8.4.4 osx'
-  - env: BUILD=stack ARGS="--resolver lts-13"
-    os: osx
-    compiler: ': #stack 8.6.5 osx'
-  - env: BUILD=stack ARGS="--resolver nightly"
-    os: osx
-    compiler: ': #stack nightly osx'
-  allow_failures:
-  - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
-  - env: BUILD=stack ARGS="--resolver nightly"
 install:
 - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo
   '?')]"
@@ -212,6 +65,121 @@ install:
       ;;
   esac
   set +ex
+jobs:
+  include:
+  - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - cabal-install-1.24
+        - ghc-8.0.2
+        - happy-1.19.5
+        - alex-3.1.7
+    compiler: ': #GHC 8.0.2'
+  - env: BUILD=cabal GHCVER=8.2.2 CABALVER=2.0 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - cabal-install-2.0
+        - ghc-8.2.2
+        - happy-1.19.5
+        - alex-3.1.7
+    compiler: ': #GHC 8.2.2'
+  - env: BUILD=cabal GHCVER=8.4.4 CABALVER=2.2 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - cabal-install-2.2
+        - ghc-8.4.4
+        - happy-1.19.5
+        - alex-3.1.7
+    compiler: ': #GHC 8.4.4'
+  - env: BUILD=cabal GHCVER=8.6.5 CABALVER=2.4 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - cabal-install-2.4
+        - ghc-8.6.5
+        - happy-1.19.5
+        - alex-3.1.7
+    compiler: ': #GHC 8.6.5'
+  - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - cabal-install-head
+        - ghc-head
+        - happy-1.19.5
+        - alex-3.1.7
+    compiler: ': #GHC HEAD'
+  - env: BUILD=stack ARGS=""
+    addons:
+      apt:
+        packages:
+        - libgmp-dev
+    compiler: ': #stack default'
+  - env: BUILD=stack ARGS="--resolver lts-9"
+    addons:
+      apt:
+        packages:
+        - libgmp-dev
+    compiler: ': #stack 8.0.2'
+  - env: BUILD=stack ARGS="--resolver lts-11"
+    addons:
+      apt:
+        packages:
+        - libgmp-dev
+    compiler: ': #stack 8.2.2'
+  - env: BUILD=stack ARGS="--resolver lts-12"
+    addons:
+      apt:
+        packages:
+        - libgmp-dev
+    compiler: ': #stack 8.4.4'
+  - env: BUILD=stack ARGS="--resolver lts-14"
+    addons:
+      apt:
+        packages:
+        - libgmp-dev
+    compiler: ': #stack 8.6.5'
+  - env: BUILD=stack ARGS="--resolver nightly"
+    addons:
+      apt:
+        packages:
+        - libgmp-dev
+    compiler: ': #stack nightly'
+  - env: BUILD=stack ARGS=""
+    os: osx
+    compiler: ': #stack default osx'
+  - env: BUILD=stack ARGS="--resolver lts-9"
+    os: osx
+    compiler: ': #stack 8.0.2 osx'
+  - env: BUILD=stack ARGS="--resolver lts-11"
+    os: osx
+    compiler: ': #stack 8.2.2 osx'
+  - env: BUILD=stack ARGS="--resolver lts-12"
+    os: osx
+    compiler: ': #stack 8.4.4 osx'
+  - env: BUILD=stack ARGS="--resolver lts-14"
+    os: osx
+    compiler: ': #stack 8.6.5 osx'
+  - env: BUILD=stack ARGS="--resolver nightly"
+    os: osx
+    compiler: ': #stack nightly osx'
+  allow_failures:
+  - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
+  - env: BUILD=stack ARGS="--resolver nightly"
+os: linux
 cache:
   directories:
   - $HOME/.ghc
@@ -243,5 +211,4 @@ before_install:
     brew install gsl
   fi
 language: generic
-sudo: false
 
