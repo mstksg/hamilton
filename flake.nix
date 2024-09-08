@@ -21,7 +21,7 @@
         {
           inherit name;
           src = ./.;
-          excludeCompilerMajors = [ "ghc910" "ghc911" ];
+          excludeCompilerMajors = [ "ghc911" ];
           defaultCompiler = "ghc982";
         };
     in
