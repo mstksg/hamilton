@@ -7,8 +7,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
 -- |
 -- Module      : Numeric.Hamilton
@@ -382,7 +382,7 @@ hamEqs Sys{..} Phs{..} = (dHdp, -dHdq)
     dTdq = gvecR
       . flip fmap (_sysHessian phsPositions)
       $ \djdq ->
-        -phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta
+        -(phsMomenta <.> ijmj #> trj #> mm #> djdq #> ijmj #> phsMomenta)
     dHdp = ijmj #> phsMomenta
     dHdq = dTdq + _sysPotentialGrad phsPositions
 
@@ -420,9 +420,8 @@ evolveHam' _ _ [] = []
 evolveHam' s p0 ts = V.withSizedList (toList ts') $ \(v :: V.Vector s Double) ->
   case Proxy @2 %<=? Proxy @s of
     LE Refl ->
-      (if l1 then tail else id)
-        . toList
-        $ evolveHam s p0 v
+      (if l1 then toList . V.tail @(s - 1) else toList) $
+        evolveHam s p0 v
     NLE{} -> error "evolveHam': Internal error"
   where
     (l1, ts') = case ts of
@@ -449,7 +448,7 @@ evolveHam s p0 ts =
     eps = 1.49012e-08
     f :: LA.Vector Double -> LA.Vector Double
     f =
-      uncurry (\p m -> LA.vjoin [p, m])
+      (\(p, m) -> LA.vjoin [p, m])
         . join bimap extract
         . hamEqs s
         . toPs
@@ -458,9 +457,9 @@ evolveHam s p0 ts =
     fromPs :: Phase n -> LA.Vector Double
     fromPs p = LA.vjoin . map extract $ [phsPositions p, phsMomenta p]
     toPs :: LA.Vector Double -> Phase n
-    toPs v = Phs pP pM
-      where
-        Just [pP, pM] = traverse create . LA.takesV [n, n] $ v
+    toPs v = case traverse create . LA.takesV [n, n] $ v of
+      Just [pP, pM] -> Phs pP pM
+      _ -> error "evolveHam: internal error"
 
 -- | A convenience wrapper for 'evolveHam'' that works on configuration
 -- space states instead of phase space states.

@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -11,10 +9,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
@@ -37,20 +32,18 @@ import Data.IORef
 import Data.List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
-import Data.Semigroup ((<>))
 import qualified Data.Vector as VV
 import qualified Data.Vector.Sized as V
 import qualified Data.Vector.Storable.Sized as VS
 import GHC.TypeLits
-import Graphics.Vty hiding (Config, (<|>))
-import Graphics.Vty.Config
+import Graphics.Vty hiding ((<|>))
 import Graphics.Vty.CrossPlatform (mkVty)
 import Numeric.Hamilton
 import Numeric.LinearAlgebra.Static hiding (dim, (<>))
 import Numeric.LinearAlgebra.Static.Vector
 import Options.Applicative
+import qualified Prettyprinter as PP
 import System.Exit
-import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import Text.Printf
 import Text.Read
 
@@ -134,7 +127,7 @@ twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
         -- positions are calculated assuming (0,0) is the center
         -- of mass
         ( \(V2 r θ) ->
-            let r1 = r * realToFrac (-m2 / mT)
+            let r1 = r * realToFrac (-(m2 / mT))
                 r2 = r * realToFrac (m1 / mT)
              in V4
                   (r1 * cos θ)
@@ -142,7 +135,7 @@ twoBody m1 m2 ω0 = SE "Two-Body" (V2 "r" "θ") s f (toPhase s c0)
                   (r2 * cos θ)
                   (r2 * sin θ)
         ) -- coordinates
-        (\(V2 r _) -> -realToFrac (m1 * m2) / r) -- potential
+        (\(V2 r _) -> -(realToFrac (m1 * m2) / r)) -- potential
     f :: R 4 -> [V2 Double]
     f (split -> (xs, ys)) = grVec <$> [xs, ys]
     c0 :: Config 2
@@ -160,7 +153,7 @@ spring mB mW k x0 = SE "Spring hanging from block" (V3 "r" "x" "θ") s f (toPhas
         ( \(V3 r x θ) ->
             realToFrac k * x ** 2 / 2 -- spring
               + (1 - logistic (-1.5) 25 0.1 r) -- left rail wall
-              + (logistic 1.5 25 0.1 r) -- right rail wall
+              + logistic 1.5 25 0.1 r -- right rail wall
               + realToFrac mB * ((1 + x) * (-cos θ)) -- gravity
         )
     f :: R 3 -> [V2 Double]
@@ -189,7 +182,7 @@ bezier ps = SE "Bezier" (V1 "t") s f (toPhase s c0)
     c0 :: Config 1
     c0 = Cfg (0.5 :: R 1) (0.25 :: R 1)
 
-data ExampleOpts = EO {eoChoice :: SysExampleChoice}
+newtype ExampleOpts = EO {eoChoice :: SysExampleChoice}
 
 data SysExampleChoice
   = SECDoublePend Double Double
@@ -456,9 +449,9 @@ main = do
                   , printf "PE: %.4f" . pe seSystem . phsPositions $ p
                   , printf "H : %.4f" . hamiltonian seSystem $ p
                   , " "
-                  , printf "rate: x%.2f <>" $ soRate
-                  , printf "hist: % 5d []" $ soHist
-                  , printf "zoom: x%.2f -+" $ soZoom
+                  , printf "rate: x%.2f <>" soRate
+                  , printf "hist: % 5d []" soHist
+                  , printf "zoom: x%.2f -+" soZoom
                   ]
               pts =
                 (`zip` ptAttrs) . seDraw . underlyingPos seSystem . phsPositions $
@@ -475,7 +468,7 @@ main = do
           threadDelay (round (1000000 / fps))
           go hists' p'
     addHist hl new old = take hl (new ++ old)
-    descr :: PP.Doc
+    descr :: PP.Doc x
     descr =
       PP.vcat
         [ "Run examples from the hamilton library example suite."
@@ -564,12 +557,12 @@ mkRange ::
 mkRange (wd, ht) = \case
   PXY xb yb -> (xb, yb)
   PX xb RR{..} ->
-    let yr = (uncurry (-) xb) * ht / wd * rrRatio
+    let yr = uncurry (-) xb * ht / wd * rrRatio
         y0 = (rrZero - 1) * yr
      in (xb, (y0, y0 + yr))
   PY RR{..} yb ->
-    let xr = (uncurry (-) yb) * wd / ht / rrRatio
-        x0 = (rrZero - 1) * xr
+    let xr = uncurry (-) yb * wd / ht / rrRatio
+        x0 = rrZero - 1 * xr
      in ((x0, x0 + xr), yb)
 
 pattern V1 :: a -> V.Vector 1 a
@@ -607,7 +600,7 @@ pattern V4 x y z a <- (V.toList -> [x, y, z, a])
 
 logistic ::
   Floating a => a -> a -> a -> a -> a
-logistic pos ht width = \x -> ht / (1 + exp (-beta * (x - pos)))
+logistic pos ht width = \x -> ht / (1 + exp (-(beta * (x - pos))))
   where
     beta = log (0.9 / (1 - 0.9)) / width
 
