@@ -14,7 +14,7 @@
 -- Module      : Numeric.Hamilton
 -- Description : Hamiltonian dynamics for physical systems on generalized
 --               coordinates using automatic differentiation
--- Copyright   : (c) Justin Le 2016
+-- Copyright   : (c) Justin Le 2024
 -- License     : BSD-3
 -- Maintainer  : justin@jle.im
 -- Stability   : unstable
