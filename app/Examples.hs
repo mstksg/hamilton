@@ -39,6 +39,8 @@ import           Data.List
 import           Data.Semigroup                      ((<>))
 import           GHC.TypeLits
 import           Graphics.Vty hiding                 (Config, (<|>))
+import           Graphics.Vty.Config
+import           Graphics.Vty.CrossPlatform (mkVty)
 import           Numeric.Hamilton
 import           Numeric.LinearAlgebra.Static hiding (dim, (<>))
 import           Numeric.LinearAlgebra.Static.Vector
@@ -315,7 +317,7 @@ main = do
        <> progDescDoc (Just descr)
         )
 
-    vty <- mkVty =<< standardIOConfig
+    vty <- mkVty defaultConfig
 
     opts <- newIORef $ SO 0.5 1 25
 
